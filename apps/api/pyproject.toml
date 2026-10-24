@@ -48,6 +48,8 @@ ignore = ["S101"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106"]
+# Alembic env.py must set up sys.path before importing app modules.
+"migrations/env.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.12"

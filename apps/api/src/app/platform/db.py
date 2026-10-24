@@ -79,9 +79,7 @@ async def set_tenant_context(session: AsyncSession, school_id: str) -> None:
     why set_config is used instead.
     """
     await session.execute(
-        text("SELECT set_config('app.school_id', :school_id, true)").bindparams(
-            school_id=school_id
-        )
+        text("SELECT set_config('app.school_id', :school_id, true)").bindparams(school_id=school_id)
     )
 
 

@@ -13,7 +13,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 # Topics at launch (spec §12). Do not invent topics ad hoc; add here.
 TOPIC_ASSESSMENT_STATE_CHANGED = "assessment.state_changed"

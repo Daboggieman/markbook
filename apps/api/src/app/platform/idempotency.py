@@ -93,9 +93,7 @@ async def idempotent_response(
     status, body = await handler()
     await r.set(
         redis_key,
-        json.dumps(
-            {"fingerprint": fingerprint, "status": status, "body": body}, default=str
-        ),
+        json.dumps({"fingerprint": fingerprint, "status": status, "body": body}, default=str),
         ex=settings.idempotency_key_ttl_seconds,
     )
     return status, body

@@ -43,9 +43,7 @@ class AuditEvent(Base):
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     school_id: Mapped[UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     actor_id: Mapped[UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     actor_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)  # IPv4/IPv6
     action: Mapped[str] = mapped_column(String(100), nullable=False)

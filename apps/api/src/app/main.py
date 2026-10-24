@@ -11,15 +11,12 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app.platform import db as platform_db
 from app.platform.config import get_settings
 from app.platform.errors import (
-    VALIDATION_ERROR,
     ProblemError,
     problem_exception_handler,
-    problem_response,
 )
 from app.platform.logging import configure_logging, set_request_context
 
@@ -54,9 +51,15 @@ def create_app() -> FastAPI:
     )
 
     # Exception handler for our typed errors.
-    app.add_exception_handler(ProblemError, problem_exception_handler)
+    # (Cast needed: starlette's registry is typed for Exception, the handler
+    # is deliberately narrower — FastAPI dispatches by exception class.)
+    app.add_exception_handler(
+        ProblemError,
+        problem_exception_handler,  # type: ignore[arg-type]
+    )
 
-    # Request logging middleware — sets request context for every log line.
+    # Request logging middleware — sets request context for every log line
+    # and echoes the X-Request-Id back on the response (spec §8).
     @app.middleware("http")
     async def log_request(request: Request, call_next):
         import uuid
@@ -72,7 +75,12 @@ def create_app() -> FastAPI:
         try:
             response = await call_next(request)
         except Exception as exc:
-            log.error("request_failed", method=request.method, path=request.url.path, error=str(exc))
+            log.error(
+                "request_failed",
+                method=request.method,
+                path=request.url.path,
+                error=str(exc),
+            )
             raise
         else:
             log.info(
@@ -81,12 +89,12 @@ def create_app() -> FastAPI:
                 path=request.url.path,
                 status=response.status_code,
             )
+        response.headers["X-Request-Id"] = rid
         return response
 
     # Health endpoint — used by the load balancer and docker healthcheck.
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, Any]:
-        from app.platform.logging import get_logger
 
         db_status = {"database": "unknown"}
         try:

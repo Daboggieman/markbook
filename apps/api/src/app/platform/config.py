@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     s3_secret_key: str = ""
 
     # Auth (used from Phase 1; declared here so config is complete)
-    jwt_secret: str = "dev-only-change-me"
+    jwt_secret: str = "dev-only-change-me"  # noqa: S105 - dev default; env wins in prod
     jwt_algorithm: str = "HS256"
     access_token_ttl_seconds: int = 900  # 10-15 min per spec §7.1
     refresh_token_ttl_seconds: int = 60 * 60 * 24 * 14

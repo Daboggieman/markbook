@@ -6,8 +6,6 @@ denylist and callers must pass allowlisted fields only.
 """
 
 import logging
-import sys
-from collections.abc import MutableMapping
 from contextvars import ContextVar
 from typing import Any
 
@@ -71,9 +69,7 @@ def configure_logging(level: str = "INFO", fmt: str = "json") -> None:
             structlog.processors.format_exc_info,
             renderer,
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(
-            logging.getLevelName(level.upper())
-        ),
+        wrapper_class=structlog.make_filtering_bound_logger(logging.getLevelName(level.upper())),
         logger_factory=structlog.PrintLoggerFactory(),
         cache_logger_on_first_use=True,
     )
@@ -83,9 +79,7 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     return structlog.get_logger(name)  # type: ignore[no-any-return]
 
 
-def set_request_context(
-    request_id: str, school_id: str = "-", actor_id: str = "-"
-) -> None:
+def set_request_context(request_id: str, school_id: str = "-", actor_id: str = "-") -> None:
     """Bind request context for the current async context."""
     request_id_ctx.set(request_id)
     school_id_ctx.set(school_id)

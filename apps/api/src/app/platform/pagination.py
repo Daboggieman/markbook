@@ -32,7 +32,7 @@ class Page:
 
 
 def encode_cursor(sort_value: Any, last_id: str) -> str:
-    raw = f"{sort_value}|{last_id}".encode("utf-8")
+    raw = f"{sort_value}|{last_id}".encode()
     return base64.urlsafe_b64encode(raw).decode("ascii")
 
 
@@ -49,9 +49,7 @@ def page_params(limit: int | None, cursor: str | None) -> tuple[int, Cursor | No
     """Validate limit against the hard max; decode the cursor."""
     settings = get_settings()
     limit_value = (
-        min(settings.default_page_size, settings.max_page_size)
-        if limit is None
-        else limit
+        min(settings.default_page_size, settings.max_page_size) if limit is None else limit
     )
     if limit_value < 1:
         raise ProblemError(VALIDATION_ERROR, "limit must be at least 1")

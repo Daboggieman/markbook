@@ -15,6 +15,7 @@ Conventions (spec §6): UUIDv7-shaped UUID PKs (uuid7 generated in Python),
 timestamptz UTC, no hard deletes for academic data (not applicable to these
 four tables — they are cross-tenant infrastructure).
 """
+
 from collections.abc import Sequence
 
 from alembic import op
