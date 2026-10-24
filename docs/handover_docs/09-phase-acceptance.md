@@ -22,13 +22,19 @@ output.
 
 | Criterion | Verified | Command + result |
 | --- | --- | --- |
-| docker compose up | — | — |
-| health endpoint | — | — |
-| CI green | — | — |
-| RLS test (two schools) | — | — |
-| OpenAPI at /openapi.json | — | — |
-
-ADRs 001–005 in `docs/adr/`.
+| ruff check | ✅ 2026-10-24 | `ruff check .` → All checks passed! |
+| ruff format | ✅ 2026-10-24 | `ruff format --check .` → 34 files already formatted |
+| mypy (full tree) | ✅ 2026-10-24 | `mypy src/app tests migrations` → Success: no issues found in 44 source files |
+| mypy strict (grading/access) | ✅ 2026-10-24 | `mypy src/app/grading src/app/access` → Success (3 files) |
+| import-linter | ✅ 2026-10-24 | `lint-imports --config contracts.ini` → Contracts: 4 kept, 0 broken |
+| pytest unit+api | ✅ 2026-10-24 | `pytest tests/unit tests/api -q` → 15 passed |
+| OpenAPI at /openapi.json | ✅ 2026-10-24 | TestClient: `test_openapi_served` passes; spec served at FastAPI default |
+| Request-id middleware echo | ✅ 2026-10-24 | `test_request_id_middleware` passes — X-Request-Id echoed on response |
+| docker compose up | ⏳ PENDING | Docker daemon not running. Start Docker, then `docker compose -f infra/compose.dev.yml up -d --build` |
+| health endpoint (live) | ⏳ PENDING | After compose up: `curl localhost:8000/health` → `{"status":"ok","database":"ok"}` |
+| alembic upgrade head (clean DB) | ⏳ PENDING | `cd apps/api && .venv/bin/alembic -c ../../alembic.ini upgrade head` against the compose postgres |
+| RLS test (two schools) | ⏳ PENDING | `pytest tests/security -m rls -q` — needs Docker (testcontainers) |
+| CI green | ⏳ PENDING | Same checks as above in GitHub Actions; cannot run locally without a push |
 
 ---
 
@@ -155,10 +161,49 @@ ADRs 001–005 in `docs/adr/`.
 - Load targets met (500 concurrent teachers; 1,500-student term processing)
 - Pilot checklist signed off
 
-| Criterion | Verified | Command + result |
-| --- | --- | --- |
-| Security review | — | — |
-| Backup restore drill | — | — |
-| Load: 500 concurrent teachers | — | — |
-| Load: 1,500-student processing | — | — |
 | Pilot checklist | — | — |
+
+---
+
+## Phase 0 delivered files (2026-10-24)
+
+Built this session on branch `markbook_phase_0`:
+
+- **Monorepo layout** — `apps/api` (FastAPI + SQLAlchemy async + Alembic), `apps/worker` (Arq
+  entrypoint), `apps/web`, `apps/desktop`, `packages/{api-client,ui,rules}` (skeletons),
+  `infra/`, `docs/adr/`
+- **Config system** — `platform/config.py` (pydantic-settings, env + .env)
+- **DB session with tenant context** — `platform/db.py`; `set_config('app.school_id', …, true)`
+  inside the transaction (SET LOCAL cannot take bind params — ADR 004)
+- **Alembic baseline** — `migrations/versions/0001_baseline.py`: schools (seeded), audit_events
+  (append-only by design), outbox_events (RLS enabled + policy), jobs; indexes per spec §6
+- **Logging with request ids** — `platform/logging.py` (structlog JSON, request/school/actor
+  context, scrubber denylist)
+- **Error format** — `platform/errors.py`: RFC 7807, stable machine codes, FastAPI exception
+  handler
+- **Pagination** — `platform/pagination.py`: cursor round-trip, hard max 200
+- **Idempotency** — `platform/idempotency.py`: Redis-backed, 24 h TTL, fingerprint mismatch → 422
+- **Outbox helpers** — `platform/outbox.py`: `enqueue_outbox_event` for the three launch topics
+- **Docker compose** — `infra/compose.dev.yml`: postgres 17, redis 7, minio, api, worker
+  (healthchecks wired)
+- **Dockerfiles** — `infra/docker/api.Dockerfile`, `infra/docker/worker.Dockerfile`
+- **Worker entrypoint** — `apps/worker/worker.py` (Arq WorkerSettings; job list empty until
+  Phase 2)
+- **CI** — `.github/workflows/ci.yml`: ruff, mypy, import-linter, pytest (unit+api), DB tests
+  via testcontainers
+- **ADRs 001–005** — monolith, outbox, Arq, tenant-context/RLS, WeasyPrint
+- **`.env.example`** — all environment variables with dev placeholders
+- **Import-linter note**: `contracts.ini` carries the no-cross-repository contract with
+  forbidden_modules for `.repository` submodules that Phase 1 will create; the self-import
+  `ignore_imports` entries are documented in the file and must be added when the first
+  repository.py lands
+
+### Deviations from spec (recorded per rule 14)
+
+- Compose file lives at `infra/compose.dev.yml` (spec §4 layout reads as `infra/` root) with
+  Dockerfiles under `infra/docker/`.
+- RLS policy ships on `outbox_events` only in Phase 0 — the other three baseline tables are
+  cross-tenant infrastructure; full RLS lands with the tenant-owned tables (Phase 1+). The RLS
+  *test* proves the mechanism, not full coverage.
+- `unmatched_ignore_imports_alerting = warning` in contracts.ini until Phase 1 adds the
+  repository self-import ignore entries.

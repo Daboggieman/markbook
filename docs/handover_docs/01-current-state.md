@@ -23,19 +23,27 @@
 
 | Deliverable | Status | Notes |
 |---|---|---|
-| Monorepo layout (apps/api, apps/worker, apps/web, apps/desktop, packages/) | Missing | — |
-| docker compose (api, worker, postgres, redis, minio) | Missing | — |
-| Config system (pydantic-settings, env loading) | Missing | — |
-| DB session with tenant context (SET LOCAL app.school_id) | Missing | — |
-| Alembic baseline migrations (schools, audit_events, outbox_events, jobs + RLS) | Missing | — |
-| Logging with request ids (structlog-style JSON) | Missing | — |
-| Error format (RFC 7807 problem details) | Missing | — |
-| Pagination and idempotency helpers | Missing | — |
-| CI pipeline (GitHub Actions) | Missing | — |
-| Import-linter (module boundary rules) | Missing | — |
-| ADRs 001–005 | Missing | — |
+| Monorepo layout (apps/api, apps/worker, apps/web, apps/desktop, packages/) | ✅ Done | Skeleton + full api platform layer |
+| docker compose (api, worker, postgres, redis, minio) | Built, **unverified** | `infra/compose.dev.yml` written; `up` blocked on Docker daemon not running |
+| Config system (pydantic-settings, env loading) | ✅ Built | `platform/config.py` |
+| DB session with tenant context (set_config + RLS) | ✅ Built | `platform/db.py`; ADR 004 |
+| Alembic baseline (schools, audit_events, outbox_events, jobs + RLS) | Built, **needs live-DB run** | `alembic upgrade head` untested (no DB) |
+| Logging with request ids (structlog JSON) | ✅ Built | Middleware echoes X-Request-Id (tested) |
+| Error format (RFC 7807 problem details) | ✅ Built | Handler registered; unit-tested |
+| Pagination and idempotency helpers | ✅ Built | Unit-tested (15 tests pass) |
+| CI pipeline (GitHub Actions) | ✅ Written | `.github/workflows/ci.yml` — runs on push |
+| Import-linter (module boundary rules) | ✅ Verified | 4/4 contracts KEPT |
+| ADRs 001–005 | ✅ Done | `docs/adr/001`–`005` |
 
-**Result: all Missing. Implementation starts.**
+**Measured gates, 2026-10-24** (all run from `apps/api` with `.venv`):
+`ruff check` clean · `ruff format --check` clean · `mypy` clean (44 files) ·
+`lint-imports` 4/4 KEPT · `pytest tests/unit tests/api -q` → 15 passed.
+
+**Blocked on Docker daemon (not running):** `docker compose up`, live health endpoint,
+`alembic upgrade head` against real Postgres, RLS testcontainers run. Sign-off rows for these
+sit in [`09-phase-acceptance.md`](09-phase-acceptance.md) as PENDING.
+
+**Result: Partial — local gates green, Docker-dependent gates pending.**
 
 ## Open items carried into Phase 0
 
