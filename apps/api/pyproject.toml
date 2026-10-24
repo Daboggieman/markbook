@@ -1,0 +1,132 @@
+[project]
+name = "markbook-api"
+version = "0.1.0"
+description = "Markbook API — modular monolith (FastAPI + SQLAlchemy + Postgres)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "alembic>=1.14",
+    "psycopg[binary,pool]>=3.2",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "redis>=5.2",
+    "arq>=0.26",
+    "uuid7>=0.1.0",
+    "structlog>=24.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.28",
+    "testcontainers[postgres]>=4.8",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "import-linter>=2.1",
+    "types-passlib",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "DJ", "ASYNC"]
+# S101 (assert) is fine in tests; S608 flags string-built SQL, which we want kept.
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["app.grading.*", "app.access.*"]
+disallow_untyped_defs = true
+warn_return_any = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q --strict-markers"
+markers = [
+    "rls: tests that require real Postgres with RLS enabled",
+]
+
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "platform depends on nothing"
+type = "forbidden"
+source_modules = ["app.platform"]
+forbidden_modules = [
+    "app.identity", "app.access", "app.people", "app.academic",
+    "app.assessment", "app.grading", "app.workflow", "app.documents",
+    "app.sync", "app.audit",
+]
+
+[[tool.importlinter.contracts]]
+name = "audit and access are callable by all, depend only on platform"
+type = "layers"
+layers = ["app.audit | app.access", "app.platform"]
+
+[[tool.importlinter.contracts]]
+name = "no module reaches into another module's tables"
+type = "forbidden"
+source_modules = [
+    "app.identity", "app.people", "app.academic", "app.assessment",
+    "app.grading", "app.workflow", "app.documents", "app.sync",
+]
+forbidden_modules = [
+    "app.identity.repository",
+    "app.access.repository",
+    "app.people.repository",
+    "app.academic.repository",
+    "app.assessment.repository",
+    "app.grading.repository",
+    "app.workflow.repository",
+    "app.documents.repository",
+    "app.sync.repository",
+    "app.audit.repository",
+]
+ignore_imports = [
+    "app.access.repository -> app.access.repository",
+    "app.identity.repository -> app.identity.repository",
+    "app.people.repository -> app.people.repository",
+    "app.academic.repository -> app.academic.repository",
+    "app.assessment.repository -> app.assessment.repository",
+    "app.grading.repository -> app.grading.repository",
+    "app.workflow.repository -> app.workflow.repository",
+    "app.documents.repository -> app.documents.repository",
+    "app.sync.repository -> app.sync.repository",
+    "app.audit.repository -> app.audit.repository",
+]
+
+[[tool.importlinter.contracts]]
+name = "workflow may depend on grading; nothing depends on workflow except documents"
+type = "layers"
+layers = [
+    "app.workflow",
+    "app.grading",
+]
+containers = ["app"]
+ignore_imports = [
+    "app.documents.service -> app.workflow.service",
+]
