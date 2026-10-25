@@ -1,0 +1,103 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: markbook_app
+      POSTGRES_PASSWORD: markbook_app_dev_password
+      POSTGRES_DB: markbook
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U markbook_app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+
+  minio:
+    image: docker.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: markbook
+      MINIO_ROOT_PASSWORD: markbook_dev_password
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles: ["storage"]
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    volumes:
+      - minio_data:/data
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      MARKBOOK_ENVIRONMENT: dev
+      MARKBOOK_DATABASE_URL: postgresql+psycopg://markbook_app:markbook_app_dev_password@postgres:5432/markbook
+      MARKBOOK_REDIS_URL: redis://redis:6379/0
+      MARKBOOK_S3_ENDPOINT: http://minio:9000
+      MARKBOOK_S3_BUCKET: markbook-dev
+      MARKBOOK_S3_ACCESS_KEY: markbook
+      MARKBOOK_S3_SECRET_KEY: markbook_dev_password
+      MARKBOOK_LOG_LEVEL: DEBUG
+      MARKBOOK_LOG_FORMAT: console
+      MARKBOOK_JWT_SECRET: dev-only-change-this
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ../apps/api:/app:cached
+
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/worker.Dockerfile
+    environment:
+      MARKBOOK_ENVIRONMENT: dev
+      MARKBOOK_DATABASE_URL: postgresql+psycopg://markbook_app:markbook_app_dev_password@postgres:5432/markbook
+      MARKBOOK_REDIS_URL: redis://redis:6379/0
+      MARKBOOK_S3_ENDPOINT: http://minio:9000
+      MARKBOOK_S3_BUCKET: markbook-dev
+      MARKBOOK_S3_ACCESS_KEY: markbook
+      MARKBOOK_S3_SECRET_KEY: markbook_dev_password
+      MARKBOOK_LOG_LEVEL: DEBUG
+      MARKBOOK_LOG_FORMAT: console
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../apps:/app:cached
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
