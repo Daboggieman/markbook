@@ -1,4 +1,4 @@
-"""Identity module — SQLAlchemy models (Phase 1)."""
+"""Identity module — SQLAlchemy models"""
 
 from datetime import UTC, datetime
 from typing import Any
@@ -49,7 +49,6 @@ class User(Base):
 
     sessions: Mapped[list["Session"]] = relationship("Session", back_populates="user", lazy="noload")
     devices: Mapped[list["Device"]] = relationship("Device", back_populates="user", lazy="noload")
-    roles: Mapped[list["UserRole"]] = relationship("UserRole", back_populates="user", lazy="noload")
 
 
 class Session(Base):
@@ -94,7 +93,3 @@ class Device(Base):
     device_key: Mapped[bytes | None] = mapped_column(BYTEA, nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="devices", lazy="noload")
-
-
-# Import from access to avoid circular imports at type-check time
-from app.access.models import Role, Permission, RolePermission, UserRole  # noqa: E402, F401
