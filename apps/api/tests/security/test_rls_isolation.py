@@ -42,9 +42,13 @@ async def _create_app_role(url: str) -> None:
 
 def _app_role_url(url: str) -> str:
     """Swap the connection URL to the app role (no superuser)."""
-    scheme, rest = url.split("://", 1)
-    host_part = rest.split("@", 1)[1] if "@" in rest else rest
-    return f"{scheme}://markbook_app:markbook_app@{host_part}"
+    from urllib.parse import urlparse, urlunparse
+
+    parsed = urlparse(url)
+    netloc = f"markbook_app:markbook_app@{parsed.hostname}"
+    if parsed.port:
+        netloc += f":{parsed.port}"
+    return urlunparse((parsed.scheme, netloc, parsed.path, "", "", ""))
 
 
 async def _insert_outbox(url: str, school_id, topic: str) -> None:

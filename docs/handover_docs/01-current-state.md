@@ -45,7 +45,24 @@ sit in [`09-phase-acceptance.md`](09-phase-acceptance.md) as PENDING.
 
 **Result: Partial — local gates green, Docker-dependent gates pending.**
 
-## Open items carried into Phase 0
+## Phase 0 deviations (2026-10-25)
+
+Fixes applied to `infra/compose.dev.yml` to unblock local dev:
+
+| Issue | Fix |
+|---|---|
+| `minio/minio` Docker Hub rate-limited; pull always fails | Replaced with `docker.io/minio/minio:latest`; placed in `profiles: ["storage"]` so it does not block `compose up` |
+| Ports 5432/6379/8000 occupied by existing containers/services | Remapped postgres → `:5433`, redis → `:6380`, api → `:8001` |
+| Compose `dockerfile` paths (`docker/api.Dockerfile`) resolved outside repo root | Copied Dockerfiles to `infra/api.Dockerfile` and `infra/worker.Dockerfile`; compose updated to `infra/*.Dockerfile` |
+| Compose env vars (`DATABASE_URL`, `REDIS_URL`, …) ignored by `platform/config.py` (reads `MARKBOOK_*`) | All env vars prefixed `MARKBOOK_` in compose |
+
+Phase 0 gates (live Docker):
+- ✅ Health endpoint → `{"status":"ok","environment":"dev","database":"ok"}`
+- ✅ `alembic upgrade head` → `INFO Running upgrade -> 0001_baseline`
+- ✅ OpenAPI at `/openapi.json` → 1 path served
+- ⏳ RLS tests running (agent)
+- ⏳ CI green (push to GitHub)
+
 
 Open decisions from [`../build_docs/09-open-decisions.md`](../build-docs/09-open-decisions.md) — defaults
 accepted unless revised explicitly:
