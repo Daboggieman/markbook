@@ -15,6 +15,9 @@ dependencies = [
     "arq>=0.26",
     "uuid7>=0.1.0",
     "structlog>=24.4",
+    "passlib[argon2]>=1.7",
+    "PyJWT>=2.10",
+    "pyotp>=2.9",
 ]
 
 [project.optional-dependencies]
