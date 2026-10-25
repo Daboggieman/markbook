@@ -28,7 +28,7 @@ services:
       - redis_data:/data
 
   minio:
-    image: minio/minio:latest
+    image: docker.io/minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: markbook
@@ -38,6 +38,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    profiles: ["storage"]
     ports:
       - "9000:9000"   # API
       - "9001:9001"   # Console
@@ -47,7 +48,7 @@ services:
   api:
     build:
       context: ..
-      dockerfile: docker/api.Dockerfile
+      dockerfile: infra/api.Dockerfile
     ports:
       - "8000:8000"
     environment:
@@ -66,8 +67,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
@@ -79,7 +78,7 @@ services:
   worker:
     build:
       context: ..
-      dockerfile: docker/worker.Dockerfile
+      dockerfile: infra/worker.Dockerfile
     environment:
       APP_ENVIRONMENT: dev
       DATABASE_URL: postgresql+psycopg://markbook_app:markbook_app_dev_password@postgres:5432/markbook
