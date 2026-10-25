@@ -16,8 +16,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.access.service import Actor
-from app.platform.models import AuditEvent
 from app.platform.logging import get_logger
+from app.platform.models import AuditEvent
 
 log = get_logger("audit")
 
@@ -57,6 +57,19 @@ class AuditService:
         self._actor = actor
         self._last_hash: bytes | None = None
 
+    def _last_stored_hash(self, school_id: UUID) -> bytes | None:
+        """The most recent stored hash for the school (chain head), if any."""
+        from sqlalchemy import text as _text
+
+        row = self._s.execute(
+            _text(
+                "SELECT hash FROM audit_events WHERE school_id = :sid "
+                "ORDER BY at DESC, id DESC LIMIT 1"
+            ),
+            {"sid": school_id},
+        ).first()
+        return row[0] if row else None
+
     def write(
         self,
         action: str,
@@ -68,11 +81,7 @@ class AuditService:
         request_id: str | None = None,
         actor_ip: str | None = None,
     ) -> Any:
-        """Append an audit event with its chain hash, in the current transaction.
-
-        The first event in a transaction chain-extends the last stored event
-        for the school; subsequent writes extend within the transaction.
-        """
+        """Append an audit event with its chain hash, in the current transaction."""
         if self._last_hash is None:
             self._last_hash = self._last_stored_hash(self._actor.school_id)
 
@@ -116,10 +125,12 @@ class AuditService:
         """Verify the hash chain for a school. Returns (ok, error_messages)."""
         from sqlalchemy import text as _text
 
-        from app.platform.models import AuditEvent
-
         result = await self._s.execute(
-            _text_select_events(school_id)
+            _text(
+                "SELECT id, school_id, at, actor_id, action, entity_type, entity_id, "
+                "before, after, reason, request_id, prev_hash, hash "
+                "FROM audit_events WHERE school_id = :sid ORDER BY at ASC, id ASC"
+            ).bindparams(sid=school_id)
         )
         rows = result.fetchall()
         prev_hash: bytes | None = None
@@ -152,8 +163,3 @@ class AuditService:
             prev_hash = stored_hash
 
         return len(errors) == 0, errors
-
-
-def _text_select_events(school_id):
-    """Helper kept private; unused placeholder retained for API stability."""
-    return None
