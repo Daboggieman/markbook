@@ -19,28 +19,39 @@ SEED_SCHOOL_B = UUID("00000000-0000-7000-8000-00000000000b")
 
 
 @pytest.fixture(scope="session")
-async def pg_url() -> AsyncIterator[str]:
+def pg_url() -> str:
     """A real Postgres for the session (docker required)."""
     try:
-        from testcontainers.postgres import PostgresContainer
+        from testcontainers.community.postgres import PostgresContainer
     except ImportError:
         pytest.skip("testcontainers not installed")
-    with PostgresContainer("postgres:17-alpine") as pg:
-        url = pg.get_connection_url().replace("psycopg2", "psycopg")
+    with PostgresContainer("postgres:17-alpine", username="test", password="test") as pg:
+        from urllib.parse import urlparse, urlunparse
+
+        raw = pg.get_connection_url().replace("psycopg2", "psycopg")
+        # testcontainers omits the password when user == password; restore it.
+        parsed = urlparse(raw)
+        netloc = f"test:test@{parsed.hostname}"
+        if parsed.port:
+            netloc += f":{parsed.port}"
+        url = urlunparse((parsed.scheme, netloc, parsed.path, "", "", ""))
         yield url
 
 
 @pytest.fixture(scope="session")
-async def migrated_url(pg_url: str) -> AsyncIterator[str]:
+def migrated_url(pg_url: str) -> str:
     """Run alembic migrations against the throwaway Postgres; yield the URL."""
+    import concurrent.futures
+
     from alembic import command
     from alembic.config import Config
 
     cfg = Config()
     cfg.set_main_option("script_location", str(Path(__file__).parents[1] / "migrations"))
     cfg.set_main_option("sqlalchemy.url", pg_url)
-    command.upgrade(cfg, "head")
-    yield pg_url
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        pool.submit(command.upgrade, cfg, "head").result()
+    return pg_url
 
 
 @pytest.fixture
