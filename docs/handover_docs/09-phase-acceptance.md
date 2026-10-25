@@ -30,10 +30,10 @@ output.
 | pytest unit+api | ✅ 2026-10-24 | `pytest tests/unit tests/api -q` → 15 passed |
 | OpenAPI at /openapi.json | ✅ 2026-10-24 | TestClient: `test_openapi_served` passes; spec served at FastAPI default |
 | Request-id middleware echo | ✅ 2026-10-24 | `test_request_id_middleware` passes — X-Request-Id echoed on response |
-| docker compose up | ⏳ PENDING | Docker daemon not running. Start Docker, then `docker compose -f infra/compose.dev.yml up -d --build` |
-| health endpoint (live) | ⏳ PENDING | After compose up: `curl localhost:8000/health` → `{"status":"ok","database":"ok"}` |
-| alembic upgrade head (clean DB) | ⏳ PENDING | `cd apps/api && .venv/bin/alembic -c ../../alembic.ini upgrade head` against the compose postgres |
-| RLS test (two schools) | ⏳ PENDING | `pytest tests/security -m rls -q` — needs Docker (testcontainers) |
+| docker compose up | ✅ 2026-10-25 | `docker compose -f infra/compose.dev.yml up -d --build` → all services started (postgres on :5433, redis on :6380, api on :8001) |
+| health endpoint (live) | ✅ 2026-10-25 | `curl localhost:8001/health` → `{"status":"ok","environment":"dev","database":"ok"}` |
+| alembic upgrade head (clean DB) | ✅ 2026-10-25 | `MARKBOOK_DATABASE_URL=...@localhost:5433/markbook alembic -c alembic.ini upgrade head` → `INFO Running upgrade -> 0001_baseline` |
+| RLS test (two schools) | ✅ 2026-10-25 | `pytest tests/security -v` → 2 passed in 18.81s — cross-tenant read isolation verified; unset context returns empty |
 | CI green | ⏳ PENDING | Same checks as above in GitHub Actions; cannot run locally without a push |
 
 ---

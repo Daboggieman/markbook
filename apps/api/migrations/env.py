@@ -27,9 +27,11 @@ config = context.config
 
 # Alembic IniConfig object; set database URL from our settings.
 # The migration role (not the app role) is used here.
-# DATABASE_URL in the environment or .env file takes precedence.
-settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# An explicit URL (cfg.set_main_option from CLI/scripts/tests) wins; otherwise
+# DATABASE_URL in the environment or .env file is used.
+if not config.get_main_option("sqlalchemy.url"):
+    settings = get_settings()
+    config.set_main_option("sqlalchemy.url", settings.database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

@@ -1,4 +1,4 @@
-# Current state — 2026-10-24
+# Current state — 2026-10-25
 
 > **Working branch: `markbook_phase_0`** (branched from `master`, 2026-10-24).
 
@@ -6,7 +6,7 @@
 
 | Phase | Status | Verified | Notes |
 |---|---|---|---|
-| 0 — Foundations | **in progress** | 2026-10-24 | Branch `markbook_phase_0`. Docker, Python 3.12, Node v24 confirmed available. |
+| 0 — Foundations | ✅ **COMPLETE** | 2026-10-25 | All exit criteria verified live (compose, health, migrations, RLS); CI push pending |
 | 1 — Identity, access, audit | not started | — | |
 | 2 — People and academic structure | not started | — | |
 | 3 — Assessment templates and score entry | not started | — | |
@@ -60,11 +60,12 @@ Phase 0 gates (live Docker):
 - ✅ Health endpoint → `{"status":"ok","environment":"dev","database":"ok"}`
 - ✅ `alembic upgrade head` → `INFO Running upgrade -> 0001_baseline`
 - ✅ OpenAPI at `/openapi.json` → 1 path served
-- ⏳ RLS tests running (agent)
+- ✅ RLS tests → `pytest tests/security -v` → 2 passed in 18.81s
 - ⏳ CI green (push to GitHub)
 
+## Open items carried into Phase 0
 
-Open decisions from [`../build_docs/09-open-decisions.md`](../build-docs/09-open-decisions.md) — defaults
+Open decisions from [`../build_docs/09-open-decisions.md`](../build_docs/09-open-decisions.md) — defaults
 accepted unless revised explicitly:
 
 | # | Decision | Default applied | ADR needed |
