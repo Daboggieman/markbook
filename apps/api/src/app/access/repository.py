@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.access.models import Permission, Role, RolePermission, UserRole
+from app.access.models import Role, RolePermission, UserRole
 
 
 class AccessRepository:

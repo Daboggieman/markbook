@@ -181,7 +181,9 @@ def _upgrade() -> None:
     op.execute("ALTER TABLE role_permissions ENABLE ROW LEVEL SECURITY")
     op.execute(
         "CREATE POLICY role_permissions_tenant_isolation ON role_permissions "
-        "USING (role_id IN (SELECT id FROM roles WHERE school_id = current_setting('app.school_id', true)::uuid))"
+        "USING (role_id IN ("
+        "SELECT id FROM roles WHERE school_id = current_setting('app.school_id', true)::uuid)"
+        ")"
     )
 
     # --- Super Admin protection trigger ------------------------------------
@@ -288,8 +290,9 @@ def _upgrade() -> None:
     ]
     for code, desc in permissions_seed:
         op.execute(
-            f"INSERT INTO permissions (code, description) VALUES ('{code}', '{desc}') "
-            "ON CONFLICT (code) DO NOTHING"
+            "INSERT INTO permissions (code, description) VALUES (:code, :desc) "
+            "ON CONFLICT (code) DO NOTHING",
+            {"code": code, "desc": desc},
         )
 
     # --- Seed: Super Admin role -------------------------------------------

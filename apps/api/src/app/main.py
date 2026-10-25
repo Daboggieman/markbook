@@ -109,8 +109,9 @@ def create_app() -> FastAPI:
         }
 
     # Import and include routers here. Phase 1 adds identity and access routers.
-    # from app.identity.router import router as identity_router
-    # app.include_router(identity_router, prefix="/api/v1/identity", tags=["identity"])
+    from app.identity.router import router as identity_router
+
+    app.include_router(identity_router, prefix="/api/v1", tags=["identity"])
 
     return app
 

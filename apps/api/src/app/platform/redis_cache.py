@@ -42,7 +42,6 @@ async def get_cached_token_version(user_id: UUID) -> int | None:
     # Cache miss: load from DB and populate.
     from sqlalchemy import text
 
-    from app.platform.db import get_sessionmaker
 
     maker = get_sessionmaker()
     async with maker() as session:

@@ -25,11 +25,20 @@ import pyotp
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.identity.models import Device, Session, User
+from app.identity.models import Session, User
 from app.identity.repository import IdentityRepository
 from app.identity.schemas import LoginResponse, MfaSetupResponse, RefreshResponse
 from app.platform.config import get_settings
-from app.platform.errors import ProblemError
+from app.platform.errors import (
+    ACCOUNT_LOCKED,
+    ACCOUNT_NOT_ACTIVE,
+    CONFLICT,
+    INVALID_CREDENTIALS,
+    INVALID_REFRESH,
+    ProblemError,
+    REFRESH_REUSED,
+    SESSION_EXPIRED,
+)
 
 # Argon2id password hashing (spec §7.1); parameters come from config.
 _pwd_context: "PasswordContext" | None = None
@@ -39,7 +48,6 @@ class PasswordContext:
     """Argon2id hashing tuned from config (verify_and_update rehashes lazily)."""
 
     def __init__(self) -> None:
-        from passlib.context import CryptContext
 
         settings = get_settings()
         self._ctx = CryptContext(
@@ -75,7 +83,7 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain: str, password_hash: str) -> bool:
-    return _password_context().verify(password, password_hash)
+    return _password_context().verify(plain, password_hash)
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +306,6 @@ class IdentityService:
         password: str,
         is_super_admin: bool = False,
     ) -> User:
-        settings = get_settings()
         existing = await self._repo.get_user_by_email(school_id, email)
         if existing is not None:
             raise ProblemError(CONFLICT, "A user with this email already exists")
@@ -315,7 +322,6 @@ class IdentityService:
     # ---- MFA --------------------------------------------------------------
 
     async def setup_mfa(self, user: User) -> MfaSetupResponse:
-        import pyotp
 
         secret = pyotp.random_base32()
         user.mfa_secret = secret
@@ -324,7 +330,6 @@ class IdentityService:
         return MfaSetupResponse(secret=secret, otpauth_uri=uri)
 
     async def verify_mfa(self, user: User, totp_code: str) -> bool:
-        import pyotp
 
         if not user.mfa_secret:
             return False

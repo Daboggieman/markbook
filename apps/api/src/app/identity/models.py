@@ -1,7 +1,6 @@
 """Identity module — SQLAlchemy models"""
 
 from datetime import UTC, datetime
-from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -10,9 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    LargeBinary,
     String,
-    Text,
 )
 from sqlalchemy.dialects.postgresql import BYTEA, CITEXT, INET, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
