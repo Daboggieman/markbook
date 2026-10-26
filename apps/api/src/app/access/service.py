@@ -105,8 +105,9 @@ def authorize(
     """Pure decision function (spec §7.2). `grants` are (code, scope) pairs.
 
     Raises ProblemError(PERMISSION_DENIED) when the permission is not granted
-    or the resource check fails; the caller (dependency) decides about audit
-    logging for sensitive permissions.
+    OR the resource check fails; the caller (dependency) decides about audit
+    logging for sensitive permissions. Only the allow path returns a Decision,
+    so callers can never mistake a deny for an allow.
     """
     relevant = [scope for code, scope in grants if code == permission]
     if not relevant:
@@ -118,18 +119,21 @@ def authorize(
 
     if scope == "assigned":
         if resource is None or not resource.assignment_keys:
-            return Decision(
-                allowed=False,
-                scope=scope,
-                reason="no resource context for scoped permission",
+            raise ProblemError(
+                PERMISSION_DENIED,
+                "no resource context for scoped permission",
+                status=403,
             )
         # Phase 2 wires the real teacher_assignments resolver; until then the
         # assigned scope requires an explicit resource with assignment keys.
         return Decision(allowed=True, scope=scope)
 
-    # scope == "own"
+    # scope == "own" (or an unknown scope value — DB enum should prevent it,
+    # but deny-by-default here rather than treat unknown as own)
+    if scope != "own":
+        raise ProblemError(PERMISSION_DENIED, f"unknown scope: {scope}", status=403)
     if resource is None or actor is None or resource.created_by != actor.user_id:
-        return Decision(allowed=False, scope=scope, reason="resource not owned by actor")
+        raise ProblemError(PERMISSION_DENIED, "resource not owned by actor", status=403)
     return Decision(allowed=True, scope=scope)
 
 

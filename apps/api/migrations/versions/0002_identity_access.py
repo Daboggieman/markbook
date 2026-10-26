@@ -278,9 +278,10 @@ def _upgrade() -> None:
     ]
     for code, desc in permissions_seed:
         op.execute(
-            "INSERT INTO permissions (code, description) VALUES (:code, :desc) "
-            "ON CONFLICT (code) DO NOTHING",
-            {"code": code, "desc": desc},
+            text(
+                "INSERT INTO permissions (code, description) VALUES (:code, :desc) "
+                "ON CONFLICT (code) DO NOTHING"
+            ).bindparams(code=code, desc=desc)
         )
 
     # --- Seed: Super Admin role -------------------------------------------
