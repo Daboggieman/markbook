@@ -101,6 +101,10 @@ class UserListItem(BaseModel):
     created_at: datetime
 
 
+class UserStatusUpdate(BaseModel):
+    status: Annotated[str, Field(pattern="^(active|suspended|deactivated)$")]
+
+
 class UserPasswordChange(BaseModel):
     current_password: Annotated[str, Field(min_length=1)]
     new_password: Annotated[str, Field(min_length=8, max_length=128)]

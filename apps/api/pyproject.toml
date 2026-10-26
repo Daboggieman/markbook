@@ -76,4 +76,5 @@ asyncio_mode = "auto"
 addopts = "-q --strict-markers"
 markers = [
     "rls: tests that require real Postgres with RLS enabled",
+    "db: tests that require real Postgres (testcontainers, possibly destructive)",
 ]

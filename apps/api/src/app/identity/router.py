@@ -171,3 +171,24 @@ async def create_user(
         is_super_admin=body.is_super_admin,
     )
     return schemas.UserResponse.model_validate(user)
+
+
+@router.patch(
+    "/users/{user_id}",
+    response_model=schemas.UserResponse,
+    dependencies=[Depends(require("users.edit"))],
+)
+async def change_user_status(
+    user_id: UUID,
+    body: schemas.UserStatusUpdate,
+    actor: Actor = Depends(require("users.edit")),
+    session=Depends(get_db),
+) -> schemas.UserResponse:
+    """Change a user's status (active/suspended/deactivated).
+
+    Deactivating the last active Super Admin returns 409 (spec §7.1 D9).
+    """
+    service = IdentityService(session)
+    user = await service.set_user_status(user_id=user_id, new_status=body.status)
+    await session.commit()
+    return schemas.UserResponse.model_validate(user)

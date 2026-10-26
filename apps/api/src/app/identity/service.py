@@ -32,6 +32,7 @@ from app.platform.errors import (
     CONFLICT,
     INVALID_CREDENTIALS,
     INVALID_REFRESH,
+    NOT_FOUND,
     REFRESH_REUSED,
     SESSION_EXPIRED,
     ProblemError,
@@ -251,9 +252,7 @@ class IdentityService:
             password_hash=_password_context().hash(password),
             is_super_admin=is_super_admin,
         )
-        return await self._repo.create_user(user)
-
-        return await self._repo.create_user(user)
+    return await self._repo.create_user(user)
 
     async def set_user_status(
         self, *, user_id: uuid.UUID, new_status: str
