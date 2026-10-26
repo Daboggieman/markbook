@@ -10,7 +10,7 @@ input (spec §5). `token_version` is checked through a short Redis cache
 version so tokens expire within one TTL window.
 """
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 from uuid import UUID
 
@@ -18,7 +18,7 @@ from fastapi import Depends, Request
 
 from app.access.repository import AccessRepository
 from app.access.service import SENSITIVE_PERMISSIONS, Actor, ResourceRef, authorize
-from app.platform.db import get_sessionmaker
+from app.platform.db import get_sessionmaker, set_tenant_context
 from app.platform.errors import PERMISSION_DENIED, ProblemError
 from app.platform.logging import get_logger
 
@@ -78,7 +78,7 @@ async def _load_grants(session: Any, user_id: UUID) -> list[tuple[str, str]]:
 def require(
     permission: str,
     resource_loader: Callable[..., Any] | None = None,
-) -> Callable[[Request], Actor]:
+) -> Callable[[Request], Awaitable[Actor]]:
     """Route dependency: authenticate, then authorize `permission`.
 
     Usage::
@@ -128,22 +128,24 @@ def require(
 
         maker = get_sessionmaker()
         async with maker() as session:
-            grants = await _load_grants(session, actor.user_id)
-            resource: ResourceRef | None = None
-            if resource_loader is not None:
-                resource = resource_loader(session, request.path_params)
+            async with session.begin():
+                await set_tenant_context(session, str(actor.school_id))
+                grants = await _load_grants(session, actor.user_id)
+                resource: ResourceRef | None = None
+                if resource_loader is not None:
+                    resource = resource_loader(session, request.path_params)
 
-            try:
-                authorize(grants, permission, resource, actor=actor)
-            except ProblemError:
-                if permission in SENSITIVE_PERMISSIONS:
-                    log.warning(
-                        "permission_denied",
-                        permission=permission,
-                        user_id=str(actor.user_id),
-                        path=str(request.url.path),
-                    )
-                raise
+                try:
+                    authorize(grants, permission, resource, actor=actor)
+                except ProblemError:
+                    if permission in SENSITIVE_PERMISSIONS:
+                        log.warning(
+                            "permission_denied",
+                            permission=permission,
+                            user_id=str(actor.user_id),
+                            path=str(request.url.path),
+                        )
+                    raise
 
         return actor
 

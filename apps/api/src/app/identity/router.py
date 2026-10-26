@@ -4,6 +4,7 @@ Every route declares `require(...)` or `@public` (route-coverage guard).
 Business logic lives in `identity.service`; this module never touches
 repositories directly.
 """
+# ruff: noqa: B008  — Depends(require(...)) in defaults is the FastAPI idiom.
 
 from uuid import UUID
 
@@ -13,7 +14,7 @@ from app.access.dependency import require
 from app.access.service import Actor
 from app.identity import schemas
 from app.identity.service import IdentityService
-from app.platform.db import get_db
+from app.platform.db import get_db, tenant_session
 from app.platform.errors import ProblemError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -39,10 +40,10 @@ async def login(
     body: schemas.LoginRequest,
 ) -> schemas.LoginResponse:
     """Password login. Throttled per (email, IP) and per IP (spec §7.1)."""
-    async with get_db("-") as session:
-        ip = _client_ip(request)
-        # Seed School is the single tenant at launch (spec §5).
-        school_id = UUID("00000000-0000-7000-8000-000000000001")
+    ip = _client_ip(request)
+    # Seed School is the single tenant at launch (spec §5).
+    school_id = UUID("00000000-0000-7000-8000-000000000001")
+    async with tenant_session(str(school_id)) as session:
         service = IdentityService(session)
         response, _session = await service.login(
             school_id=school_id,
@@ -53,7 +54,6 @@ async def login(
             device_label=body.device_label,
             device_platform=body.device_platform,
         )
-        await session.commit()
         return response
 
 
@@ -63,9 +63,10 @@ async def refresh(body: schemas.RefreshRequest) -> schemas.RefreshResponse:
     from app.platform.db import get_sessionmaker
 
     maker = get_sessionmaker()
-    async with maker()() as session:
+    async with maker() as session:
         service = IdentityService(session)
         response = await service.refresh(body.refresh_token, ip=None)
+        await session.commit()
         return response
 
 

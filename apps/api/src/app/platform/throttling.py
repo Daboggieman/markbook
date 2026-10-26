@@ -53,7 +53,8 @@ async def record_login_failure(*, email: str, ip: str | None) -> None:
 
     failures = await redis.incr(_email_key(email))
     # Exponential backoff: window doubles with each failure past the limit.
-    ttl = settings.login_throttle_window_seconds * (2 ** max(0, failures - settings.login_max_failures))
+    backoff_factor = 2 ** max(0, failures - settings.login_max_failures)
+    ttl = settings.login_throttle_window_seconds * backoff_factor
     if failures == 1:
         await redis.expire(_email_key(email), ttl)
 

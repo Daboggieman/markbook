@@ -88,11 +88,11 @@ class Actor:
         self.is_super_admin = is_super_admin
 
 
-def broadest_scope(grants: list[tuple[str, str]]) -> str | None:
-    """The widest scope_type among grants for one permission, or None."""
-    if not grants:
+def broadest_scope(scopes: list[str]) -> str | None:
+    """The widest scope among the scopes granted for one permission, or None."""
+    if not scopes:
         return None
-    return max(grants, key=lambda g: _SCOPE_BREADTH.get(g[1], 0))[1]
+    return max(scopes, key=lambda s: _SCOPE_BREADTH.get(s, 0))
 
 
 def authorize(

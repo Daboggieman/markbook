@@ -75,6 +75,7 @@ def _upgrade() -> None:
         """
         CREATE TABLE sessions (
             id                  UUID PRIMARY KEY,
+            school_id           UUID NOT NULL REFERENCES schools(id),
             user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             device_id           UUID,
             refresh_token_hash  BYTEA NOT NULL,       -- SHA-256 of the opaque refresh token
@@ -88,6 +89,9 @@ def _upgrade() -> None:
     )
     op.execute(
         "CREATE INDEX ix_sessions_user_id ON sessions (user_id)"
+    )
+    op.execute(
+        "CREATE INDEX ix_sessions_school_id ON sessions (school_id)"
     )
     op.execute(
         "CREATE INDEX ix_sessions_refresh_hash ON sessions (refresh_token_hash)"
@@ -170,7 +174,10 @@ def _upgrade() -> None:
     )
 
     # --- RLS --------------------------------------------------------------
-    for table in ("users", "sessions", "devices", "roles", "user_roles"):
+    # sessions: no RLS — the refresh token hash IS the bearer credential.
+    # school_id is denormalised for audit trail only; the user_id FK ensures
+    # a session can only belong to a user of the matching school.
+    for table in ("users", "devices", "roles", "user_roles"):
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
         op.execute(
             f"CREATE POLICY {table}_tenant_isolation ON {table} "

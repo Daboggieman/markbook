@@ -1,4 +1,5 @@
 """Identity schemas — Pydantic request/response models (Phase 1)."""
+# ruff: noqa: S105  # "bearer"/"basic" token_type literals are not secrets.
 
 from datetime import datetime
 from typing import Annotated

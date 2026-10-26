@@ -16,9 +16,9 @@ Rules (spec §7.1):
 
 import hashlib
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import UUID, uuid4
 
 import jwt
 import pyotp
@@ -35,9 +35,9 @@ from app.platform.errors import (
     CONFLICT,
     INVALID_CREDENTIALS,
     INVALID_REFRESH,
-    ProblemError,
     REFRESH_REUSED,
     SESSION_EXPIRED,
+    ProblemError,
 )
 
 # Argon2id password hashing (spec §7.1); parameters come from config.
@@ -93,10 +93,10 @@ def verify_password(plain: str, password_hash: str) -> bool:
 
 def create_access_token(
     *,
-    user_id: UUID,
-    school_id: UUID,
+    user_id: uuid.UUID,
+    school_id: uuid.UUID,
     token_version: int,
-    session_id: UUID,
+    session_id: uuid.UUID,
     is_super_admin: bool = False,
 ) -> tuple[str, int]:
     """Return (encoded_jwt, ttl_seconds)."""
@@ -160,7 +160,7 @@ class IdentityService:
     async def login(
         self,
         *,
-        school_id: UUID,
+        school_id: uuid.UUID,
         email: str,
         password: str,
         ip: str | None = None,
@@ -211,7 +211,8 @@ class IdentityService:
 
         refresh_token = generate_refresh_token()
         session = Session(
-            id=uuid4(),
+            id=uuid.uuid4(),
+            school_id=user.school_id,
             user_id=user.id,
             refresh_token_hash=hash_refresh_token(refresh_token),
             expires_at=datetime.now(UTC)
@@ -288,10 +289,10 @@ class IdentityService:
 
     # ---- logout / revocation ----------------------------------------------
 
-    async def logout(self, session_id: UUID) -> None:
+    async def logout(self, session_id: uuid.UUID) -> None:
         await self._repo.revoke_session(session_id)
 
-    async def revoke_all_sessions(self, user_id: UUID) -> None:
+    async def revoke_all_sessions(self, user_id: uuid.UUID) -> None:
         await self._repo.revoke_all_user_sessions(user_id)
         await self._repo.increment_token_version(user_id)
 
@@ -300,7 +301,7 @@ class IdentityService:
     async def create_user(
         self,
         *,
-        school_id: UUID,
+        school_id: uuid.UUID,
         email: str,
         username: str,
         password: str,
@@ -310,7 +311,7 @@ class IdentityService:
         if existing is not None:
             raise ProblemError(CONFLICT, "A user with this email already exists")
         user = User(
-            id=uuid4(),
+            id=uuid.uuid4(),
             school_id=school_id,
             email=email,
             username=username,

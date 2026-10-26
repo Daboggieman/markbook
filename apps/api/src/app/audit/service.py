@@ -8,9 +8,10 @@ chain is maintained inside the caller's transaction.
 
 import hashlib
 import json
+import uuid
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,20 +57,21 @@ class AuditService:
         self._actor = actor
         self._last_hash: bytes | None = None
 
-    def _last_stored_hash(self, school_id: UUID) -> bytes | None:
+    async def _last_stored_hash(self, school_id: UUID) -> bytes | None:
         """The most recent stored hash for the school (chain head), if any."""
         from sqlalchemy import text as _text
 
-        row = self._s.execute(
+        result = await self._s.execute(
             _text(
                 "SELECT hash FROM audit_events WHERE school_id = :sid "
                 "ORDER BY at DESC, id DESC LIMIT 1"
             ),
             {"sid": school_id},
-        ).first()
+        )
+        row = result.first()
         return row[0] if row else None
 
-    def write(
+    async def write(
         self,
         action: str,
         entity_type: str | None = None,
@@ -82,7 +84,7 @@ class AuditService:
     ) -> Any:
         """Append an audit event with its chain hash, in the current transaction."""
         if self._last_hash is None:
-            self._last_hash = self._last_stored_hash(self._actor.school_id)
+            self._last_hash = await self._last_stored_hash(self._actor.school_id)
 
         event_dict: dict[str, Any] = {
             "school_id": self._actor.school_id,
@@ -100,7 +102,7 @@ class AuditService:
         new_hash = compute_chain_hash(self._last_hash, event_dict)
 
         event = AuditEvent(
-            id=uuid4(),
+            id=uuid.uuid4(),
             school_id=self._actor.school_id,
             at=event_dict["at"],
             actor_id=self._actor.user_id,
@@ -116,7 +118,7 @@ class AuditService:
             hash=new_hash,
         )
         self._s.add(event)
-        self._s.flush()
+        await self._s.flush()
         self._last_hash = new_hash
         return event.id
 
