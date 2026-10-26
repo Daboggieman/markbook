@@ -253,7 +253,43 @@ class IdentityService:
         )
         return await self._repo.create_user(user)
 
-    # ---- MFA --------------------------------------------------------------
+        return await self._repo.create_user(user)
+
+    async def set_user_status(
+        self, *, user_id: uuid.UUID, new_status: str
+    ) -> User:
+        """Change a user's status (active/suspended/deactivated).
+
+        Refuses to deactivate or demote the last active Super Admin (spec
+        §7.1 D9) with a clean 409; the DB trigger is the hard backstop.
+        Moving a user out of active revokes their sessions and bumps
+        token_version so outstanding access tokens die within one cache TTL.
+        """
+        user = await self._repo.get_user_by_id(user_id)
+        if user is None:
+            raise ProblemError(NOT_FOUND, "User not found", status=404)
+
+        if (
+            user.is_super_admin
+            and user.status == "active"
+            and new_status != "active"
+        ):
+            others = await self._repo.count_active_super_admins(
+                user.school_id, exclude_user_id=user.id
+            )
+            if others == 0:
+                raise ProblemError(
+                    CONFLICT, "Cannot deactivate the last active Super Admin", status=409
+                )
+
+        user.status = new_status
+        await self._repo.update_user(user)
+
+        if user.status != "active":
+            # A user who can no longer log in must not keep live sessions.
+            await self._repo.revoke_all_user_sessions(user.id)
+            await self._repo.increment_token_version(user.id)
+        return user
 
     async def setup_mfa(self, user: User) -> MfaSetupResponse:
 

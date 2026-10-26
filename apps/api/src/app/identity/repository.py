@@ -34,6 +34,18 @@ class IdentityRepository:
         await self._s.flush()
         return user
 
+    async def count_active_super_admins(self, school_id: UUID, exclude_user_id: UUID) -> int:
+        """Active super admins in the school other than `exclude_user_id`."""
+        result = await self._s.execute(
+            select(User).where(
+                User.school_id == school_id,
+                User.is_super_admin.is_(True),
+                User.status == "active",
+                User.id != exclude_user_id,
+            )
+        )
+        return len(result.scalars().all())
+
     async def increment_token_version(self, user_id: UUID) -> None:
         await self._s.execute(
             update(User).where(User.id == user_id).values(token_version=User.token_version + 1)
