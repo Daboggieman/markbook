@@ -36,9 +36,7 @@ class IdentityRepository:
 
     async def increment_token_version(self, user_id: UUID) -> None:
         await self._s.execute(
-            update(User)
-            .where(User.id == user_id)
-            .values(token_version=User.token_version + 1)
+            update(User).where(User.id == user_id).values(token_version=User.token_version + 1)
         )
 
     async def record_failed_login(self, user_id: UUID) -> None:
@@ -50,16 +48,12 @@ class IdentityRepository:
 
     async def reset_failed_logins(self, user_id: UUID) -> None:
         await self._s.execute(
-            update(User)
-            .where(User.id == user_id)
-            .values(failed_login_count=0, locked_until=None)
+            update(User).where(User.id == user_id).values(failed_login_count=0, locked_until=None)
         )
 
     async def lock_user(self, user_id: UUID, locked_until) -> None:
         await self._s.execute(
-            update(User)
-            .where(User.id == user_id)
-            .values(locked_until=locked_until)
+            update(User).where(User.id == user_id).values(locked_until=locked_until)
         )
 
     # ---- sessions ---------------------------------------------------------
@@ -69,9 +63,7 @@ class IdentityRepository:
         await self._s.flush()
         return session
 
-    async def get_session_by_refresh_hash(
-        self, refresh_token_hash: bytes
-    ) -> Session | None:
+    async def get_session_by_refresh_hash(self, refresh_token_hash: bytes) -> Session | None:
         result = await self._s.execute(
             select(Session).where(Session.refresh_token_hash == refresh_token_hash)
         )
@@ -81,9 +73,7 @@ class IdentityRepository:
         from datetime import UTC, datetime
 
         await self._s.execute(
-            update(Session)
-            .where(Session.id == session_id)
-            .values(revoked_at=datetime.now(UTC))
+            update(Session).where(Session.id == session_id).values(revoked_at=datetime.now(UTC))
         )
 
     async def revoke_all_user_sessions(self, user_id: UUID) -> None:
@@ -110,16 +100,12 @@ class IdentityRepository:
         from datetime import UTC, datetime
 
         await self._s.execute(
-            update(Device)
-            .where(Device.id == device_id)
-            .values(last_seen_at=datetime.now(UTC))
+            update(Device).where(Device.id == device_id).values(last_seen_at=datetime.now(UTC))
         )
 
     async def revoke_device(self, device_id: UUID) -> None:
         from datetime import UTC, datetime
 
         await self._s.execute(
-            update(Device)
-            .where(Device.id == device_id)
-            .values(revoked_at=datetime.now(UTC))
+            update(Device).where(Device.id == device_id).values(revoked_at=datetime.now(UTC))
         )

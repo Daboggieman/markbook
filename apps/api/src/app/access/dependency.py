@@ -39,7 +39,7 @@ def decode_bearer(request: Request) -> dict[str, Any]:
 
     Raises ProblemError(401) if absent or malformed.
     """
-    from app.identity.service import decode_access_token
+    from app.identity.tokens import decode_access_token
 
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):

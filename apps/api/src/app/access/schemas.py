@@ -31,9 +31,7 @@ class RoleResponse(BaseModel):
 
 class RolePermissionAssign(BaseModel):
     permission_codes: list[str]
-    scope_type: Annotated[
-        str, Field(pattern="^(school|assigned|own)$", default="school")
-    ]
+    scope_type: Annotated[str, Field(pattern="^(school|assigned|own)$", default="school")]
 
 
 class PermissionResponse(BaseModel):

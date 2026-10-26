@@ -35,9 +35,7 @@ def _serialize(value: Any) -> Any:
 
 def canonical_json(data: dict[str, Any]) -> bytes:
     """Stable JSON bytes for hashing: sorted keys, hash fields excluded."""
-    canonical = {
-        k: _serialize(v) for k, v in data.items() if k not in ("hash", "prev_hash")
-    }
+    canonical = {k: _serialize(v) for k, v in data.items() if k not in ("hash", "prev_hash")}
     return json.dumps(canonical, sort_keys=True, default=str).encode("utf-8")
 
 
@@ -139,9 +137,19 @@ class AuditService:
 
         for row in rows:
             (
-                row_id, row_school, at, actor_id, action, entity_type,
-                entity_id, before, after, reason, request_id,
-                stored_prev_hash, stored_hash,
+                row_id,
+                row_school,
+                at,
+                actor_id,
+                action,
+                entity_type,
+                entity_id,
+                before,
+                after,
+                reason,
+                request_id,
+                stored_prev_hash,
+                stored_hash,
             ) = row
 
             event_dict = {

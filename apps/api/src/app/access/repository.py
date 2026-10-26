@@ -14,9 +14,7 @@ class AccessRepository:
 
     # ---- effective permissions -------------------------------------------
 
-    async def effective_permissions(
-        self, user_id: UUID
-    ) -> list[tuple[str, str]]:
+    async def effective_permissions(self, user_id: UUID) -> list[tuple[str, str]]:
         """All (permission_code, scope_type) pairs granted via the user's roles.
 
         The broadest scope wins at the engine level; here we return every grant.
@@ -29,9 +27,7 @@ class AccessRepository:
         return [(row[0], row[1]) for row in result]
 
     async def role_ids_for_user(self, user_id: UUID) -> list[UUID]:
-        result = await self._s.execute(
-            select(UserRole.role_id).where(UserRole.user_id == user_id)
-        )
+        result = await self._s.execute(select(UserRole.role_id).where(UserRole.user_id == user_id))
         return [row[0] for row in result]
 
     async def role_by_id(self, role_id: UUID) -> Role | None:

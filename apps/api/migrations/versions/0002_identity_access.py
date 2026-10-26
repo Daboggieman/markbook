@@ -18,6 +18,7 @@ academic data; users/sessions/devices archive rather than delete.
 from collections.abc import Sequence
 
 from alembic import op
+from sqlalchemy import text
 
 revision: str = "0002_identity_access"
 down_revision: str | None = "0001_baseline"
@@ -33,12 +34,8 @@ depends_on: str | Sequence[str] | None = None
 def _upgrade() -> None:
     # --- enum types -------------------------------------------------------
     op.execute("CREATE TYPE userstatus AS ENUM ('active', 'suspended', 'deactivated')")
-    op.execute(
-        "CREATE TYPE scopetype AS ENUM ('school', 'assigned', 'own')"
-    )
-    op.execute(
-        "CREATE TYPE devicelabel AS ENUM ('web', 'desktop', 'mobile')"
-    )
+    op.execute("CREATE TYPE scopetype AS ENUM ('school', 'assigned', 'own')")
+    op.execute("CREATE TYPE devicelabel AS ENUM ('web', 'desktop', 'mobile')")
 
     # --- users ------------------------------------------------------------
     op.execute(
@@ -63,12 +60,8 @@ def _upgrade() -> None:
         )
         """
     )
-    op.execute(
-        "CREATE INDEX ix_users_school_id ON users (school_id)"
-    )
-    op.execute(
-        "CREATE INDEX ix_users_email ON users (school_id, email)"
-    )
+    op.execute("CREATE INDEX ix_users_school_id ON users (school_id)")
+    op.execute("CREATE INDEX ix_users_email ON users (school_id, email)")
 
     # --- sessions ---------------------------------------------------------
     op.execute(
@@ -87,15 +80,9 @@ def _upgrade() -> None:
         )
         """
     )
-    op.execute(
-        "CREATE INDEX ix_sessions_user_id ON sessions (user_id)"
-    )
-    op.execute(
-        "CREATE INDEX ix_sessions_school_id ON sessions (school_id)"
-    )
-    op.execute(
-        "CREATE INDEX ix_sessions_refresh_hash ON sessions (refresh_token_hash)"
-    )
+    op.execute("CREATE INDEX ix_sessions_user_id ON sessions (user_id)")
+    op.execute("CREATE INDEX ix_sessions_school_id ON sessions (school_id)")
+    op.execute("CREATE INDEX ix_sessions_refresh_hash ON sessions (refresh_token_hash)")
 
     # --- devices ----------------------------------------------------------
     op.execute(
@@ -113,12 +100,8 @@ def _upgrade() -> None:
         )
         """
     )
-    op.execute(
-        "CREATE INDEX ix_devices_user_id ON devices (user_id)"
-    )
-    op.execute(
-        "CREATE INDEX ix_devices_school_id ON devices (school_id)"
-    )
+    op.execute("CREATE INDEX ix_devices_user_id ON devices (user_id)")
+    op.execute("CREATE INDEX ix_devices_school_id ON devices (school_id)")
 
     # --- roles ------------------------------------------------------------
     op.execute(
@@ -134,9 +117,7 @@ def _upgrade() -> None:
         )
         """
     )
-    op.execute(
-        "CREATE INDEX ix_roles_school_id ON roles (school_id)"
-    )
+    op.execute("CREATE INDEX ix_roles_school_id ON roles (school_id)")
 
     # --- permissions (global catalogue, seeded) ---------------------------
     op.execute(
@@ -254,46 +235,46 @@ def _upgrade() -> None:
     # --- Seed: permissions catalogue -------------------------------------
     permissions_seed = [
         # --- users ---
-        ("users.view",       "View users"),
-        ("users.create",     "Create users"),
-        ("users.edit",       "Edit user details and status"),
-        ("users.delete",     "Delete users (respects Super Admin rule)"),
+        ("users.view", "View users"),
+        ("users.create", "Create users"),
+        ("users.edit", "Edit user details and status"),
+        ("users.delete", "Delete users (respects Super Admin rule)"),
         # --- roles ---
-        ("roles.view",      "View roles"),
-        ("roles.manage",    "Create and update roles"),
-        ("roles.delete",    "Delete roles"),
+        ("roles.view", "View roles"),
+        ("roles.manage", "Create and update roles"),
+        ("roles.delete", "Delete roles"),
         # --- permissions ---
-        ("permissions.view",   "View permission catalogue"),
+        ("permissions.view", "View permission catalogue"),
         ("permissions.manage", "Assign/unassign permissions to roles"),
         # --- students ---
-        ("students.view",    "View student records"),
-        ("students.create",  "Create student records"),
-        ("students.edit",   "Edit student records"),
+        ("students.view", "View student records"),
+        ("students.create", "Create student records"),
+        ("students.edit", "Edit student records"),
         ("students.archive", "Archive students"),
         ("students.check-duplicates", "Run duplicate detection"),
         # --- academic ---
-        ("academic.view",       "View academic structure"),
-        ("academic.manage",    "Create/update sessions, terms, levels, classes"),
+        ("academic.view", "View academic structure"),
+        ("academic.manage", "Create/update sessions, terms, levels, classes"),
         # --- assessments ---
-        ("assessments.view",    "View assessments and templates"),
-        ("assessments.manage",  "Create and edit assessment templates"),
+        ("assessments.view", "View assessments and templates"),
+        ("assessments.manage", "Create and edit assessment templates"),
         # --- scores ---
-        ("scores.view",       "View scores"),
-        ("scores.enter",      "Enter scores"),
-        ("scores.edit",       "Edit entered scores (draft/returned states)"),
-        ("scores.submit",     "Submit scores for review"),
-        ("scores.review",     "Start review / return scores"),
+        ("scores.view", "View scores"),
+        ("scores.enter", "Enter scores"),
+        ("scores.edit", "Edit entered scores (draft/returned states)"),
+        ("scores.submit", "Submit scores for review"),
+        ("scores.review", "Start review / return scores"),
         # --- results ---
-        ("results.process",  "Trigger result processing"),
-        ("results.approve",  "Approve results"),
-        ("results.lock",     "Lock results (online only, re-auth required)"),
-        ("results.publish",  "Publish results (online only, re-auth + MFA required)"),
-        ("results.correct",  "Issue a correction to published results"),
+        ("results.process", "Trigger result processing"),
+        ("results.approve", "Approve results"),
+        ("results.lock", "Lock results (online only, re-auth required)"),
+        ("results.publish", "Publish results (online only, re-auth + MFA required)"),
+        ("results.correct", "Issue a correction to published results"),
         # --- reports ---
-        ("reports.view",        "View report cards and documents"),
+        ("reports.view", "View report cards and documents"),
         ("transcripts.generate", "Generate transcripts"),
         # --- audit ---
-        ("audit_logs.view",  "View audit events"),
+        ("audit_logs.view", "View audit events"),
     ]
     for code, desc in permissions_seed:
         op.execute(

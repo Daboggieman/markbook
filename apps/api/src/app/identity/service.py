@@ -84,63 +84,6 @@ def verify_password(plain: str, password_hash: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# JWT helpers
-# ---------------------------------------------------------------------------
-
-
-def create_access_token(
-    *,
-    user_id: uuid.UUID,
-    school_id: uuid.UUID,
-    token_version: int,
-    session_id: uuid.UUID,
-    is_super_admin: bool = False,
-) -> tuple[str, int]:
-    """Return (encoded_jwt, ttl_seconds)."""
-    settings = get_settings()
-    now = datetime.now(UTC)
-    ttl = settings.access_token_ttl_seconds
-    claims: dict[str, Any] = {
-        "sub": str(user_id),
-        "school_id": str(school_id),
-        "token_version": token_version,
-        "session_id": str(session_id),
-        "iat": int(now.timestamp()),
-        "exp": int(now.timestamp()) + ttl,
-        "iss": "markbook",
-    }
-    if is_super_admin:
-        claims["super"] = True
-    token = jwt.encode(claims, settings.jwt_secret, algorithm=settings.jwt_algorithm)
-    return token, ttl
-
-
-def decode_access_token(token: str) -> dict[str, Any]:
-    """Decode and verify a JWT. Raises jwt.InvalidTokenError on failure."""
-    settings = get_settings()
-    return jwt.decode(
-        token,
-        settings.jwt_secret,
-        algorithms=[settings.jwt_algorithm],
-        issuer="markbook",
-        options={"require": ["exp", "sub", "school_id", "token_version", "session_id"]},
-    )
-
-
-# ---------------------------------------------------------------------------
-# Refresh tokens (opaque, rotated, reuse-detected)
-# ---------------------------------------------------------------------------
-
-
-def generate_refresh_token() -> str:
-    return secrets.token_urlsafe(48)
-
-
-def hash_refresh_token(token: str) -> bytes:
-    return hashlib.sha256(token.encode("utf-8")).digest()
-
-
-# ---------------------------------------------------------------------------
 # Identity service
 # ---------------------------------------------------------------------------
 
@@ -174,9 +117,7 @@ class IdentityService:
         if user is None:
             # Same response shape as wrong password — no user enumeration.
             await record_login_failure(email=email, ip=ip)
-            raise ProblemError(
-                INVALID_CREDENTIALS, "Invalid email or password", status=401
-            )
+            raise ProblemError(INVALID_CREDENTIALS, "Invalid email or password", status=401)
 
         if user.locked_until and user.locked_until > datetime.now(UTC):
             raise ProblemError(
@@ -188,14 +129,10 @@ class IdentityService:
         if not _password_context().verify(password, user.password_hash):
             await self._repo.record_failed_login(user.id)
             await record_login_failure(email=email, ip=ip)
-            raise ProblemError(
-                INVALID_CREDENTIALS, "Invalid email or password", status=401
-            )
+            raise ProblemError(INVALID_CREDENTIALS, "Invalid email or password", status=401)
 
         if user.status != "active":
-            raise ProblemError(
-                ACCOUNT_NOT_ACTIVE, f"Account status is '{user.status}'", status=403
-            )
+            raise ProblemError(ACCOUNT_NOT_ACTIVE, f"Account status is '{user.status}'", status=403)
 
         # Lockout from too many consecutive failures.
         settings = get_settings()
@@ -212,8 +149,7 @@ class IdentityService:
             school_id=user.school_id,
             user_id=user.id,
             refresh_token_hash=hash_refresh_token(refresh_token),
-            expires_at=datetime.now(UTC)
-            + timedelta(seconds=settings.refresh_token_ttl_seconds),
+            expires_at=datetime.now(UTC) + timedelta(seconds=settings.refresh_token_ttl_seconds),
             ip=ip,
             user_agent=user_agent,
         )

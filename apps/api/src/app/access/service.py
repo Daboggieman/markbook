@@ -110,9 +110,7 @@ def authorize(
     """
     relevant = [scope for code, scope in grants if code == permission]
     if not relevant:
-        raise ProblemError(
-            PERMISSION_DENIED, f"Missing permission: {permission}", status=403
-        )
+        raise ProblemError(PERMISSION_DENIED, f"Missing permission: {permission}", status=403)
 
     scope = broadest_scope(relevant)
     if scope == "school":

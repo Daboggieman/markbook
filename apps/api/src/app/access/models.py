@@ -20,9 +20,7 @@ class Role(Base):
     __tablename__ = "roles"
     __table_args__ = (Index("ix_roles_school_id", "school_id"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     school_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("schools.id"), nullable=False
     )
@@ -66,9 +64,7 @@ class RolePermission(Base):
     scope_type: Mapped[str] = mapped_column(String(20), nullable=False, default="school")
 
     role: Mapped["Role"] = relationship("Role", back_populates="permissions")
-    permission: Mapped["Permission"] = relationship(
-        "Permission", back_populates="role_permissions"
-    )
+    permission: Mapped["Permission"] = relationship("Permission", back_populates="role_permissions")
 
 
 class UserRole(Base):
