@@ -14,13 +14,9 @@ Rules (spec §7.1):
   - MFA: TOTP, mandatory for Super Admin and privileged roles.
 """
 
-import hashlib
-import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
-import jwt
 import pyotp
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.identity.models import Session, User
 from app.identity.repository import IdentityRepository
 from app.identity.schemas import LoginResponse, MfaSetupResponse, RefreshResponse
+from app.identity.tokens import create_access_token, generate_refresh_token, hash_refresh_token
 from app.platform.config import get_settings
 from app.platform.errors import (
     ACCOUNT_LOCKED,
