@@ -208,8 +208,8 @@ def _upgrade() -> None:
                         RAISE EXCEPTION 'Cannot deactivate the last active Super Admin';
                     END IF;
                 END IF;
-                IF OLD.is_super_admin AND NEW.is_super_admin
-                   AND OLD.is_super_admin != NEW.is_super_admin THEN
+                IF OLD.is_super_admin AND OLD.status = 'active'
+                   AND NEW.is_super_admin != OLD.is_super_admin THEN
                     SELECT COUNT(*) INTO active_super_admins
                     FROM users
                     WHERE school_id = OLD.school_id
