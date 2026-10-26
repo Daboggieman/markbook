@@ -10,7 +10,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 
-from app.access.dependency import require
+from app.access.dependency import public, require
 from app.access.service import Actor
 from app.identity import schemas
 from app.identity.service import IdentityService
@@ -34,6 +34,7 @@ def _client_ip(request: Request) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+@public
 @router.post("/login", response_model=schemas.LoginResponse)
 async def login(
     request: Request,
@@ -57,6 +58,7 @@ async def login(
         return response
 
 
+@public
 @router.post("/refresh", response_model=schemas.RefreshResponse)
 async def refresh(body: schemas.RefreshRequest) -> schemas.RefreshResponse:
     """Rotate the refresh token; reuse revokes the whole session family."""

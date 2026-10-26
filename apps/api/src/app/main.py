@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.access.dependency import public
 from app.platform import db as platform_db
 from app.platform.config import get_settings
 from app.platform.errors import (
@@ -93,6 +94,8 @@ def create_app() -> FastAPI:
         return response
 
     # Health endpoint — used by the load balancer and docker healthcheck.
+    # @public: load balancer/healthcheck traffic carries no bearer token.
+    @public
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, Any]:
 
