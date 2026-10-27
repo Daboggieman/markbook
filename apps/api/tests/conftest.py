@@ -48,6 +48,12 @@ def pg_url() -> Iterator[str]:
         if parsed.port:
             netloc += f":{parsed.port}"
         url = urlunparse((parsed.scheme, netloc, parsed.path, "", "", ""))
+
+        # Create extensions required by migrations before any fixture reads url.
+        import psycopg
+        with psycopg.connect(url) as conn:
+            conn.execute("CREATE EXTENSION IF NOT EXISTS citext")
+            conn.commit()
         yield url
 
 
