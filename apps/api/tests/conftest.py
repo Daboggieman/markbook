@@ -6,7 +6,8 @@ Migrations run against a clean database, so `alembic upgrade head` is proven
 with every DB test run.
 """
 
-from collections.abc import AsyncIterator, Iterator
+import sys
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping
 from pathlib import Path
 from uuid import UUID
 
@@ -16,6 +17,18 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 SEED_SCHOOL_A = UUID("00000000-0000-7000-8000-00000000000a")
 SEED_SCHOOL_B = UUID("00000000-0000-7000-8000-00000000000b")
+
+if sys.platform == "win32":
+    # psycopg async refuses ProactorEventLoop (the Python ≥3.8 Windows default).
+    # The pytest_asyncio_loop_factories hook is pytest-asyncio's supported way to
+    # control loop creation; on non-Windows platforms no hook is registered and
+    # default loop creation is untouched.
+    import asyncio
+
+    def pytest_asyncio_loop_factories(
+        config: pytest.Config, item: pytest.Item
+    ) -> Mapping[str, Callable[[], asyncio.AbstractEventLoop]]:
+        return {"selector": asyncio.SelectorEventLoop}
 
 
 @pytest.fixture(scope="session")
