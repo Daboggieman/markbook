@@ -41,7 +41,7 @@ def _classify() -> tuple[list[APIRoute], list[APIRoute]]:
 
 
 def _labels(routes: list[APIRoute]) -> list[str]:
-    return [f"{'/'.join(sorted(r.methods))} {r.path}" for r in routes]
+    return [f"{'/'.join(sorted(r.methods or set()))} {r.path}" for r in routes]
 
 
 def test_every_route_declares_require_or_public() -> None:

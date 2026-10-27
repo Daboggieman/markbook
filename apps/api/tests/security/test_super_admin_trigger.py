@@ -13,7 +13,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine
 
 pytestmark = pytest.mark.db
 
@@ -93,8 +93,6 @@ async def test_deactivate_allowed_when_another_active_super_admin_remains(
     await _exec(migrated_url, "UPDATE users SET status = 'suspended' WHERE id = :id", other)
 
 
-async def test_delete_non_super_admin_never_blocked(
-    migrated_url: str, school_id: str
-) -> None:
+async def test_delete_non_super_admin_never_blocked(migrated_url: str, school_id: str) -> None:
     user = await _insert_user(migrated_url, school_id, is_super_admin=False)
     await _exec(migrated_url, "DELETE FROM users WHERE id = :id", user)  # no raise

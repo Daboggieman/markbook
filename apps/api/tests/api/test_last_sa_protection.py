@@ -110,7 +110,15 @@ async def test_deactivate_revokes_sessions_and_bumps_token_version(
         assert user.status == "suspended"
 
     async with maker() as s:
-        revoked = (await s.execute(text("SELECT revoked_at FROM sessions WHERE user_id = :u"), {"u": str(user_id)})).scalar()
-        version = (await s.execute(text("SELECT token_version FROM users WHERE id = :u"), {"u": str(user_id)})).scalar()
+        revoked = (
+            await s.execute(
+                text("SELECT revoked_at FROM sessions WHERE user_id = :u"), {"u": str(user_id)}
+            )
+        ).scalar()
+        version = (
+            await s.execute(
+                text("SELECT token_version FROM users WHERE id = :u"), {"u": str(user_id)}
+            )
+        ).scalar()
         assert revoked is not None, "live sessions must be revoked on deactivation"
         assert version == 2, "token_version must bump so cached JWTs die"

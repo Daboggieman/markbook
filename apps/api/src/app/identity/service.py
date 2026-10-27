@@ -252,11 +252,9 @@ class IdentityService:
             password_hash=_password_context().hash(password),
             is_super_admin=is_super_admin,
         )
-    return await self._repo.create_user(user)
+        return await self._repo.create_user(user)
 
-    async def set_user_status(
-        self, *, user_id: uuid.UUID, new_status: str
-    ) -> User:
+    async def set_user_status(self, *, user_id: uuid.UUID, new_status: str) -> User:
         """Change a user's status (active/suspended/deactivated).
 
         Refuses to deactivate or demote the last active Super Admin (spec
@@ -268,11 +266,7 @@ class IdentityService:
         if user is None:
             raise ProblemError(NOT_FOUND, "User not found", status=404)
 
-        if (
-            user.is_super_admin
-            and user.status == "active"
-            and new_status != "active"
-        ):
+        if user.is_super_admin and user.status == "active" and new_status != "active":
             others = await self._repo.count_active_super_admins(
                 user.school_id, exclude_user_id=user.id
             )
