@@ -72,7 +72,13 @@ async def run_async_migrations() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode (real DB connection)."""
-    asyncio.run(run_async_migrations())
+    loop_kwargs: dict[str, object] = {}
+    if sys.platform == "win32":
+        # psycopg async refuses ProactorEventLoop, the Windows default since
+        # Python 3.8; pin the selector loop wherever this runs (host shell,
+        # tests' worker threads).
+        loop_kwargs["loop_factory"] = asyncio.SelectorEventLoop
+    asyncio.run(run_async_migrations(), **loop_kwargs)
 
 
 if context.is_offline_mode():
