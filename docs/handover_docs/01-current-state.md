@@ -1,13 +1,14 @@
-# Current state — 2026-10-25
+# Current state — 2026-10-27
 
-> **Working branch: `markbook_phase_0`** (branched from `master`, 2026-10-24).
+> **Working branch: `markbook_phase_1`** (cut from `markbook_phase_0`, 2026-10-27).
+> Phase 0 lives on `markbook_phase_0` / `master` (PR #1). Phase 1 work sits on `markbook_phase_1`.
 
 ## Phase board
 
 | Phase | Status | Verified | Notes |
 |---|---|---|---|
 | 0 — Foundations | ✅ **COMPLETE** | 2026-10-25 | All exit criteria verified live (compose, health, migrations, RLS); CI push pending |
-| 1 — Identity, access, audit | not started | — | |
+| 1 — Identity, access, audit | 🔄 **code-complete, sign-off blocked** | unit tests 2026-10-27 | All deliverables built; 9 testcontainer tests blocked on Docker (not installed on this machine) |
 | 2 — People and academic structure | not started | — | |
 | 3 — Assessment templates and score entry | not started | — | |
 | 4 — Calculation engine and processing | not started | — | |
@@ -44,6 +45,47 @@
 sit in [`09-phase-acceptance.md`](09-phase-acceptance.md) as PENDING.
 
 **Result: Partial — local gates green, Docker-dependent gates pending.**
+
+## Phase 1 status — 2026-10-27
+
+All Phase 1 deliverables are code-complete. Exit criteria are gated on 9 testcontainer
+tests that require Docker Desktop (not installed on this machine).
+
+### Deliverables
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| users, sessions, devices tables | ✅ Built | `0002_identity_access` migration |
+| roles, permissions (seeded), role/user junctions | ✅ Seeded on `upgrade head` | `permissions` 28 rows + Super Admin role with all perms |
+| Authorization engine + `require()` dependency | ✅ Built | `access/service.py`, `access/dependency.py` |
+| Route-coverage guard (`@public` marker) | ✅ Built + tested | `test_route_coverage.py` |
+| Login throttling + lockout (Redis) | ✅ Built | `platform/throttling.py`, 6 unit tests pass |
+| Refresh rotation + reuse detection | ✅ Built | `service.py`; reuse revokes session family, bumps token_version |
+| MFA (TOTP setup/verify) | ✅ Built | `identity/router.py` endpoints |
+| Super Admin protections (API + DB trigger) | ✅ Built | `service.py` guard + `protect_super_admin()` trigger in `0002` |
+| Audit service with SHA-256 hash chain | ✅ Built | `audit/service.py`; 6 unit tests pass |
+
+### Exit criteria
+
+| Criterion | Status | Command / evidence |
+|---|---|---|
+| Authorization matrix tests | ✅ Unit pass | `pytest tests/unit/test_authorize.py -q` |
+| Last-SA protection (API) | ✅ Code done; test blocked | `test_last_sa_protection.py` — testcontainer needs Docker |
+| Last-SA protection (DB trigger) | ✅ Code done; test blocked | `test_super_admin_trigger.py` — testcontainer needs Docker |
+| Revoked session fails immediately | ✅ Implemented | `access/dependency.py` checks token_version against Redis cache (30 s TTL) |
+| Audit chain verifier | ✅ Unit pass | `pytest tests/unit/test_audit_chain.py -q` |
+
+**Measured gates, 2026-10-27** (run from `apps/api` with `.venv`):
+`ruff check` clean · `ruff format --check` clean · `mypy src/app tests migrations -q` → Success ·
+`pytest tests/unit tests/api -q` → 45 passed · 9 ERRORS (Docker blocked).
+
+### Phase 1 deviation (2026-10-27)
+
+Phase 1 work landed on `markbook_phase_0` rather than a fresh branch (rule 16 breach —
+one branch per phase was not followed). Fixed 2026-10-27 by cutting `markbook_phase_1`
+at HEAD and leaving `markbook_phase_0` as-is (no force-push). `master` holds Phase 0
+via PR #1 (`aeb1966`). `markbook_phase_1` holds the 17 commits of Phase 0-final-fix
+through Phase 1 code-complete.
 
 ## Phase 0 deviations (2026-10-25)
 

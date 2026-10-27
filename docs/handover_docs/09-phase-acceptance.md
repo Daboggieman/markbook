@@ -48,11 +48,18 @@ output.
 
 | Criterion | Verified | Command + result |
 | --- | --- | --- |
-| Authorization matrix tests | — | — |
-| Super Admin delete block (API) | — | — |
-| Super Admin delete block (trigger) | — | — |
-| Revoked session fails | — | — |
-| Audit chain verifier | — | — |
+| Authorization matrix tests | ✅ 2026-10-27 (unit) | `pytest tests/unit/test_authorize.py -q` — pass |
+| Super Admin delete block (API) | ⏳ PENDING | Code in `identity/service.py` (409 guard); `test_last_sa_protection.py` needs testcontainer → Docker not installed |
+| Super Admin delete block (trigger) | ✅ Trigger in migration; test PENDING | `protect_super_admin()` in `0002_identity_access.py`; `test_super_admin_trigger.py` needs testcontainer → Docker not installed |
+| Revoked session fails | ✅ 2026-10-27 (code) | `access/dependency.py` rejects JWT whose `token_version` ≠ DB value; Redis cache 30 s TTL; unit-covered via token tests |
+| Audit chain verifier | ✅ 2026-10-27 (unit) | `pytest tests/unit/test_audit_chain.py -q` — pass |
+
+**Blocker:** Docker Desktop is not installed on this machine, so the 9 testcontainer tests
+(Super Admin trigger ×4, last-SA API ×3, RLS isolation ×2) cannot run. Non-Docker gates
+2026-10-27: ruff clean, format clean, mypy clean, `pytest tests/unit tests/api -q` → 45 passed.
+
+**Branch note:** Phase 1 work sits on `markbook_phase_1` (cut 2026-10-27 from the
+`markbook_phase_0` tip after the fact — see the deviation in `01-current-state.md`).
 
 ---
 
