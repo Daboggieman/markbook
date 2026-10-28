@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Enum as SAEnum,
     ForeignKey,
     Index,
     Integer,
@@ -32,7 +33,13 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(50), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(200), nullable=False)
     is_super_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    # Mirrors the userstatus enum type created by migration 0002 — declaring it
+    # as SAEnum makes comparisons render ::userstatus, not ::VARCHAR.
+    status: Mapped[str] = mapped_column(
+        SAEnum("active", "suspended", "deactivated", name="userstatus", native_enum=True),
+        nullable=False,
+        default="active",
+    )
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     mfa_secret: Mapped[str | None] = mapped_column(String(32), nullable=True)
     failed_login_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

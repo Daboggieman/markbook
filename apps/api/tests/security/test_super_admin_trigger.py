@@ -8,7 +8,7 @@ Triggers fire regardless of the connecting role, so the throwaway container's
 superuser connection exercises them fully.
 """
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import text
@@ -49,7 +49,7 @@ async def _insert_user(
                 "email": f"{user_id[:8]}@test.local",
                 "username": f"u{user_id[:8]}",
                 "sa": is_super_admin,
-                "status": status,
+                "st": status,
             },
         )
     await engine.dispose()
@@ -59,7 +59,8 @@ async def _insert_user(
 async def _exec(migrated_url: str, sql: str, user_id: str) -> None:
     engine = create_async_engine(migrated_url)
     async with engine.begin() as conn:
-        await conn.execute(text(sql).bindparams(id=user_id))
+        # Bind as UUID, not str — psycopg renders str as VARCHAR and uuid = varchar has no operator.
+        await conn.execute(text(sql).bindparams(id=UUID(user_id)))
     await engine.dispose()
 
 
