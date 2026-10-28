@@ -57,9 +57,17 @@ def pg_url() -> Iterator[str]:
             from urllib.parse import urlparse
 
             p = urlparse(conn_url)
-            kw = {k: v for k, v in [("host", p.hostname), ("port", p.port or 5432),
-                                    ("dbname", p.path.lstrip("/") or "postgres"),
-                                    ("user", p.username), ("password", p.password)] if v}
+            kw = {
+                k: v
+                for k, v in [
+                    ("host", p.hostname),
+                    ("port", p.port or 5432),
+                    ("dbname", p.path.lstrip("/") or "postgres"),
+                    ("user", p.username),
+                    ("password", p.password),
+                ]
+                if v
+            }
             return " ".join(f"{k}={v}" for k, v in kw.items())
 
         with psycopg.connect(_as_libpq(url)) as conn:

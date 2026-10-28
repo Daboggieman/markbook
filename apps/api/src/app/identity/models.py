@@ -6,11 +6,13 @@ from datetime import UTC, datetime
 from sqlalchemy import (
     Boolean,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
     Index,
     Integer,
     String,
+)
+from sqlalchemy import (
+    Enum as SAEnum,
 )
 from sqlalchemy.dialects.postgresql import BYTEA, CITEXT, INET, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship

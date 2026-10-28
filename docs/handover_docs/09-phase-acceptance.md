@@ -48,18 +48,36 @@ output.
 
 | Criterion | Verified | Command + result |
 | --- | --- | --- |
-| Authorization matrix tests | ✅ 2026-10-27 (unit) | `pytest tests/unit/test_authorize.py -q` — pass |
-| Super Admin delete block (API) | ⏳ PENDING | Code in `identity/service.py` (409 guard); `test_last_sa_protection.py` needs testcontainer → Docker not installed |
-| Super Admin delete block (trigger) | ✅ Trigger in migration; test PENDING | `protect_super_admin()` in `0002_identity_access.py`; `test_super_admin_trigger.py` needs testcontainer → Docker not installed |
-| Revoked session fails | ✅ 2026-10-27 (code) | `access/dependency.py` rejects JWT whose `token_version` ≠ DB value; Redis cache 30 s TTL; unit-covered via token tests |
-| Audit chain verifier | ✅ 2026-10-27 (unit) | `pytest tests/unit/test_audit_chain.py -q` — pass |
+| Authorization matrix tests | ✅ 2026-10-27 | `pytest tests/unit/test_authorize.py -q` — pass |
+| Super Admin delete block (API) | ✅ 2026-10-27 | `test_last_sa_protection.py` — 3 passed (sole-SA 409; suspend with second SA allowed; revocation + token bump) |
+| Super Admin delete block (trigger) | ✅ 2026-10-27 | `pytest tests/security/test_super_admin_trigger.py` — 5 passed (delete/deactivate/demote blocked; allowed with second active SA; non-SA never blocked) |
+| Revoked session fails | ✅ 2026-10-27 (code) | `access/dependency.py` rejects JWT whose `token_version` ≠ DB value; Redis cache 30 s TTL; token_version bump on revocation verified live in `test_deactivate_revokes_sessions_and_bumps_token_version` |
+| Audit chain verifier | ✅ 2026-10-27 | `pytest tests/unit/test_audit_chain.py -q` — pass |
 
-**Blocker:** Docker Desktop is not installed on this machine, so the 9 testcontainer tests
-(Super Admin trigger ×4, last-SA API ×3, RLS isolation ×2) cannot run. Non-Docker gates
-2026-10-27: ruff clean, format clean, mypy clean, `pytest tests/unit tests/api -q` → 45 passed.
+**Full-suite gates, 2026-10-27 (Docker Desktop installed):**
+`pytest tests` → **68 passed** in 17.71s (includes 10 testcontainer tests: Super Admin trigger ×5,
+last-SA API ×3, RLS isolation ×2) · `ruff check` clean · `ruff format --check` clean (64 files) ·
+`mypy src/app tests migrations` → Success (64 files).
 
-**Branch note:** Phase 1 work sits on `markbook_phase_1` (cut 2026-10-27 from the
-`markbook_phase_0` tip after the fact — see the deviation in `01-current-state.md`).
+**Fixes required to run the Docker-gated tests on this machine (Windows, Python 3.14):**
+- `migrations/env.py` — run async migrations with `loop_factory=asyncio.SelectorEventLoop` on
+  win32 (psycopg async refuses ProactorEventLoop; also affects host-side `alembic upgrade`).
+- `tests/conftest.py` — register `pytest_asyncio_loop_factories` hook (Windows only) so
+  pytest-asyncio builds Selector loops; enable `citext` extension on the testcontainer before
+  migrations; libpq connection-string helper for the extension call.
+- `migrations/versions/0002_identity_access.py` — `user_roles` RLS policy referenced a
+  `school_id` column the table never had; added `school_id UUID NOT NULL` (+index), matching
+  the model's tenancy convention.
+- `src/app/identity/models.py` — `User.status` declared `String(20)` but the DB column is the
+  `userstatus` enum; comparisons rendered `::VARCHAR` and failed. Declared as native `Enum`.
+  (`RolePermission.scope_type` has the same String-vs-`scopetype` mismatch but no code path
+  compares it in SQL yet — flagged for Phase 2.)
+- Test bugs (never run against a live DB before 2026-10-28): bind-name mismatch (`:st` vs
+  `"status"`) and str-vs-UUID bind in `test_super_admin_trigger.py::_exec`; revocation test
+  seeded its user as a lone Super Admin (correctly hit the 409 guard) and never committed the
+  service transaction (router commits after service calls) — both corrected.
+
+**Result: Phase 1 exit criteria all verified 2026-10-27.**
 
 ---
 
