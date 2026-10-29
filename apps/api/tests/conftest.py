@@ -48,31 +48,6 @@ def pg_url() -> Iterator[str]:
         if parsed.port:
             netloc += f":{parsed.port}"
         url = urlunparse((parsed.scheme, netloc, parsed.path, "", "", ""))
-
-        # Create extensions required by migrations before any fixture reads url.
-        import psycopg
-
-        def _as_libpq(conn_url: str) -> str:
-            """Convert a postgresql+psycopg:// URL to a libpq keyword string."""
-            from urllib.parse import urlparse
-
-            p = urlparse(conn_url)
-            kw = {
-                k: v
-                for k, v in [
-                    ("host", p.hostname),
-                    ("port", p.port or 5432),
-                    ("dbname", p.path.lstrip("/") or "postgres"),
-                    ("user", p.username),
-                    ("password", p.password),
-                ]
-                if v
-            }
-            return " ".join(f"{k}={v}" for k, v in kw.items())
-
-        with psycopg.connect(_as_libpq(url)) as conn:
-            conn.execute("CREATE EXTENSION IF NOT EXISTS citext")
-            conn.commit()
         yield url
 
 
