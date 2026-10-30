@@ -107,24 +107,7 @@ def require(
     """
 
     async def dependency(request: Request) -> Actor:
-        claims = decode_bearer(request)
-
-        # token_version revocation check (Redis cache, 30 s TTL).
-        version_now = await get_cached_token_version(UUID(claims["sub"]))
-        if version_now is not None and int(claims["token_version"]) != version_now:
-            raise ProblemError(
-                PERMISSION_DENIED,
-                "Token revoked; sign in again",
-                status=401,
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        actor = Actor(
-            user_id=UUID(claims["sub"]),
-            school_id=UUID(claims["school_id"]),
-            token_version=int(claims["token_version"]),
-            session_id=UUID(claims["session_id"]),
-        )
+        actor = await _authenticate(request)
 
         maker = get_sessionmaker()
         async with maker() as session:
@@ -150,6 +133,63 @@ def require(
         return actor
 
     return dependency
+
+
+async def _authenticate(request: Request) -> Actor:
+    """Decode the bearer token and verify token_version against Redis."""
+    claims = decode_bearer(request)
+    version_now = await get_cached_token_version(UUID(claims["sub"]))
+    if version_now is not None and int(claims["token_version"]) != version_now:
+        raise ProblemError(
+            PERMISSION_DENIED,
+            "Token revoked; sign in again",
+            status=401,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return Actor(
+        user_id=UUID(claims["sub"]),
+        school_id=UUID(claims["school_id"]),
+        token_version=int(claims["token_version"]),
+        session_id=UUID(claims["session_id"]),
+    )
+
+
+def require_with_scope(
+    permission: str,
+) -> Callable[[Request], Awaitable[tuple[Actor, str]]]:
+    """As require(), but returns `(actor, scope)` for list endpoints.
+
+    Lists have no single resource to authorize against — the scoping IS the
+    authorization (spec §7.2). The caller passes the returned scope to the
+    service: 'school' lists everything, 'assigned' narrows to the actor's
+    teacher assignments (Phase 2 resolver), 'own' the service's call.
+    """
+
+    async def dependency(request: Request) -> tuple[Actor, str]:
+        actor = await _authenticate(request)
+        maker = get_sessionmaker()
+        async with maker() as session:
+            async with session.begin():
+                await set_tenant_context(session, str(actor.school_id))
+                grants = await _load_grants(session, actor.user_id)
+        scope = scope_filter(grants, permission)
+        return actor, scope
+
+    return dependency
+
+
+async def get_actor_db(request: Request) -> AsyncIterator[AsyncSession]:
+    """DB dependency with the tenant context derived from the bearer token.
+
+    get_db leaves `app.school_id` unset, and RLS then hides every row from the
+    non-superuser app role — any route reading tenant data must use this one.
+    """
+    claims = decode_bearer(request)
+    school_id = str(UUID(claims["school_id"]))
+    async with get_sessionmaker()() as session:
+        async with session.begin():
+            await set_tenant_context(session, school_id)
+            yield session
 
 
 def get_db_session(school_id: str = "-") -> Any:

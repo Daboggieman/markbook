@@ -5,19 +5,25 @@ second layer behind it (docs/handover_docs/02-api-conventions.md). Archive
 stamps `status`/`archived_at` only — enrolments (and the results Phase 4 will
 attach to them) are never touched, which is what keeps history intact
 (spec §6: archive, not delete).
+
+The assigned-scope filter reads `enrolments`/`teacher_assignments` (academic
+tables, models only — never academic's repository; see contracts.ini). This
+people → academic read edge is the one exception to the module direction in
+04-module-reference.md and is recorded there.
 """
 
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.academic.models import Enrolment, TeacherAssignment
 from app.people.models import Guardian, Student, StudentGuardian
 
 
 class PeopleRepository:
-    def __init__(self, session) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
     # ---- students ---------------------------------------------------------
@@ -29,7 +35,7 @@ class PeopleRepository:
 
     async def get_student(self, school_id: UUID, student_id: UUID) -> Student | None:
         result = await self._s.execute(
-            select_student().where(Student.school_id == school_id, Student.id == student_id)
+            select(Student).where(Student.school_id == school_id, Student.id == student_id)
         )
         return result.scalar_one_or_none()
 
@@ -42,39 +48,40 @@ class PeopleRepository:
         status: str | None = None,
         q: str | None = None,
         teacher_user_id: UUID | None = None,
-        after: tuple[str, str] | None = None,
         limit: int = 50,
     ) -> list[Student]:
-        """List students, newest-first is wrong for a roster — name order here.
+        """Name-ordered roster.
 
         `teacher_user_id` narrows to students the teacher is assigned to for
         the session (the `assigned` scope, spec §7.2): the student must have a
         live enrolment in that session whose (class_id, section_id) matches a
-        teacher assignment, where a NULL assignment section means the whole
-        class.
+        teacher assignment — a NULL assignment section means the whole class.
         """
-        from app.academic.models import Enrolment, TeacherAssignment
-
-        stmt = select_student().where(Student.school_id == school_id)
+        stmt = select(Student).where(Student.school_id == school_id)
         if status is not None:
             stmt = stmt.where(Student.status == status)
-        if session_id is not None:
-            live = (
+        if class_id is not None:
+            if session_id is None:
+                raise ValueError("class_id filter needs the session_id it belongs to")
+            stmt = stmt.where(
                 select(Enrolment.id)
                 .where(
                     Enrolment.student_id == Student.id,
-                    Enrolment.school_id == school_id,
                     Enrolment.session_id == session_id,
+                    Enrolment.class_id == class_id,
                     Enrolment.status == "enrolled",
                 )
                 .exists()
             )
-            stmt = stmt.where(exists_placeholder := True) if False else stmt
-        if class_id is not None:
-            stmt = stmt.join(Enrolment, (Enrolment.student_id == Student.id)).where(
-                Enrolment.session_id == session_id if session_id else True,
-                Enrolment.class_id == class_id,
-                Enrolment.status == "enrolled",
+        elif session_id is not None:
+            stmt = stmt.where(
+                select(Enrolment.id)
+                .where(
+                    Enrolment.student_id == Student.id,
+                    Enrolment.session_id == session_id,
+                    Enrolment.status == "enrolled",
+                )
+                .exists()
             )
         if q:
             like = f"%{q.lower()}%"
@@ -86,7 +93,6 @@ class PeopleRepository:
         if teacher_user_id is not None:
             if session_id is None:
                 raise ValueError("assigned scope needs a session_id")
-            ta = TeacherAssignment
             stmt = stmt.where(
                 select(Enrolment.id)
                 .join(
@@ -133,9 +139,9 @@ class PeopleRepository:
         min_similarity: float = 0.6,
         limit: int = 10,
     ) -> list[tuple[Student, float]]:
-        """Trigram similarity over `lower(first || ' ' || last)` (migration 0003
-        index). Uses the `%` operator so the GIN trgm index is usable, and
-        scores each hit with similarity() for the caller to rank."""
+        """Trigram similarity over `lower(first || ' ' || last)` — the index
+        migration 0003 built. Filters with the `%` operator so the GIN trgm
+        index is usable, and scores each hit with similarity() to rank."""
         full = func.lower(Student.first_name + " " + Student.last_name)
         target = func.lower(f"{first_name} {last_name}")
         score = func.similarity(full, target).label("score")
@@ -156,15 +162,14 @@ class PeopleRepository:
 
     # ---- guardians --------------------------------------------------------
 
-    async def create_guardian(self, guardian) -> None:
+    async def create_guardian(self, guardian: Guardian) -> Guardian:
         self._s.add(guardian)
         await self._s.flush()
+        return guardian
 
-    async def get_guardian(self, school_id: UUID, guardian_id: UUID):
-        from sqlalchemy import select as _sel
-
+    async def get_guardian(self, school_id: UUID, guardian_id: UUID) -> Guardian | None:
         result = await self._s.execute(
-            _sel(Guardian).where(Guardian.school_id == school_id, Guardian.id == guardian_id)
+            select(Guardian).where(Guardian.school_id == school_id, Guardian.id == guardian_id)
         )
         return result.scalar_one_or_none()
 
@@ -180,9 +185,3 @@ class PeopleRepository:
             .order_by(Guardian.name)
         )
         return list(result.scalars().all())
-
-
-def select_student():
-    from sqlalchemy import select
-
-    return select(Student)
