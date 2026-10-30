@@ -75,6 +75,10 @@ class DuplicateCheckResponse(BaseModel):
     candidates: list[DuplicateCandidate]
 
 
+class StudentArchive(BaseModel):
+    version: int  # optimistic concurrency (02-api-conventions.md)
+
+
 # ---------------------------------------------------------------------------
 # Guardians
 # ---------------------------------------------------------------------------

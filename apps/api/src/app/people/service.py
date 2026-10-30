@@ -200,3 +200,6 @@ class PeopleService:
         student = await self.get_student(school_id, student_id)
         student.status = "graduated"
         await self._repo.update_student(student)
+
+    async def list_guardians(self, student_id: UUID) -> list[Guardian]:
+        return await self._repo.list_guardians_for_student(student_id)

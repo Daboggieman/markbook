@@ -10,14 +10,21 @@ input (spec §5). `token_version` is checked through a short Redis cache
 version so tokens expire within one TTL window.
 """
 
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 from uuid import UUID
 
 from fastapi import Depends, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.access.repository import AccessRepository
-from app.access.service import SENSITIVE_PERMISSIONS, Actor, ResourceRef, authorize
+from app.access.service import (
+    SENSITIVE_PERMISSIONS,
+    Actor,
+    ResourceRef,
+    authorize,
+    scope_filter,
+)
 from app.platform.db import get_sessionmaker, set_tenant_context
 from app.platform.errors import PERMISSION_DENIED, ProblemError
 from app.platform.logging import get_logger
