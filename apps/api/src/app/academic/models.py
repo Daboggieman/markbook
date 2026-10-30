@@ -14,16 +14,17 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
-    Index,
     Integer,
     String,
+)
+from sqlalchemy import (
+    Enum as SAEnum,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.people.models import uuid7
+from app.people.models import Student, uuid7
 from app.platform.models import Base
 
 
@@ -185,8 +186,13 @@ class Enrolment(Base):
     section_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     status: Mapped[str] = mapped_column(
         SAEnum(
-            "enrolled", "promoted", "repeated", "graduated", "withdrawn",
-            name="enrolmentstatus", native_enum=True,
+            "enrolled",
+            "promoted",
+            "repeated",
+            "graduated",
+            "withdrawn",
+            name="enrolmentstatus",
+            native_enum=True,
         ),
         nullable=False,
         default="enrolled",
@@ -271,9 +277,7 @@ class PromotionRecord(Base):
     from_enrolment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("enrolments.id"), nullable=False
     )
-    to_enrolment_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    to_enrolment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     decision: Mapped[str] = mapped_column(String(20), nullable=False)
     decided_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     decided_at: Mapped[datetime] = mapped_column(

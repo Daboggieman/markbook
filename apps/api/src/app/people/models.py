@@ -12,12 +12,14 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
     Index,
     Integer,
     String,
     Text,
+)
+from sqlalchemy import (
+    Enum as SAEnum,
 )
 from sqlalchemy.dialects.postgresql import CITEXT, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -34,9 +36,7 @@ def uuid7() -> uuid.UUID:
 
 class Student(Base):
     __tablename__ = "students"
-    __table_args__ = (
-        Index("ix_students_school_names", "school_id", "last_name", "first_name"),
-    )
+    __table_args__ = (Index("ix_students_school_names", "school_id", "last_name", "first_name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     school_id: Mapped[uuid.UUID] = mapped_column(
@@ -50,14 +50,13 @@ class Student(Base):
     dob: Mapped[date | None] = mapped_column(Date, nullable=True)
     sex: Mapped[str | None] = mapped_column(String(10), nullable=True)
     status: Mapped[str] = mapped_column(
-        SAEnum("active", "graduated", "withdrawn", "archived", name="studentstatus",
-               native_enum=True),
+        SAEnum(
+            "active", "graduated", "withdrawn", "archived", name="studentstatus", native_enum=True
+        ),
         nullable=False,
         default="active",
     )
-    archived_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

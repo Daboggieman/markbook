@@ -94,7 +94,9 @@ class AcademicService:
         try:
             return await self._repo.create_term(term)
         except IntegrityError as exc:
-            raise ProblemError(CONFLICT, "A term with that name already exists in the session") from exc
+            raise ProblemError(
+                CONFLICT, "A term with that name already exists in the session"
+            ) from exc
 
     async def list_terms(self, school_id: UUID, session_id: UUID) -> list[Term]:
         return await self._repo.list_terms(school_id, session_id)
@@ -128,7 +130,9 @@ class AcademicService:
         try:
             return await self._repo.create_section(section)
         except IntegrityError as exc:
-            raise ProblemError(CONFLICT, "A section with that name already exists in the class") from exc
+            raise ProblemError(
+                CONFLICT, "A section with that name already exists in the class"
+            ) from exc
 
     async def list_sections(self, school_id: UUID, class_id: UUID) -> list[Section]:
         return await self._repo.list_sections(school_id, class_id)
@@ -164,9 +168,7 @@ class AcademicService:
 
     # ---- enrolments ---------------------------------------------------------------
 
-    async def enrol_student(
-        self, school_id: UUID, data: schemas.EnrolmentCreate
-    ) -> Enrolment:
+    async def enrol_student(self, school_id: UUID, data: schemas.EnrolmentCreate) -> Enrolment:
         await self.get_session(school_id, data.session_id)
         await self.get_class(school_id, data.class_id)
         student = await self._s.scalar(
@@ -249,16 +251,12 @@ class AcademicService:
         try:
             return await self._repo.create_teacher_assignment(assignment)
         except IntegrityError as exc:
-            raise ProblemError(
-                CONFLICT, "Assignment references a missing teacher user"
-            ) from exc
+            raise ProblemError(CONFLICT, "Assignment references a missing teacher user") from exc
 
     async def list_teacher_assignments(
         self, school_id: UUID, teacher_user_id: UUID, session_id: UUID
     ) -> list[TeacherAssignment]:
-        return await self._repo.list_teacher_assignments(
-            school_id, teacher_user_id, session_id
-        )
+        return await self._repo.list_teacher_assignments(school_id, teacher_user_id, session_id)
 
     # ---- promotions ----------------------------------------------------------------------
 
@@ -266,9 +264,7 @@ class AcademicService:
         self, school_id: UUID, data: schemas.PromotionRunRequest, decided_by: UUID
     ) -> schemas.PromotionRunResponse:
         if data.from_session_id == data.to_session_id:
-            raise ProblemError(
-                INVALID_STATE_TRANSITION, "from and to sessions must differ"
-            )
+            raise ProblemError(INVALID_STATE_TRANSITION, "from and to sessions must differ")
         await self.get_session(school_id, data.from_session_id)
         await self.get_session(school_id, data.to_session_id)
 
@@ -300,8 +296,15 @@ class AcademicService:
             try:
                 async with self._s.begin_nested():
                     outcome = await self._apply_decision(
-                        school_id, decision, enrolment, data.to_session_id,
-                        sequence, position, today, decided_by, people,
+                        school_id,
+                        decision,
+                        enrolment,
+                        data.to_session_id,
+                        sequence,
+                        position,
+                        today,
+                        decided_by,
+                        people,
                     )
                     outcomes.append(outcome)
             except ProblemError as exc:

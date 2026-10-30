@@ -26,9 +26,7 @@ class PeopleService:
 
     # ---- students ---------------------------------------------------------
 
-    async def create_student(
-        self, school_id: UUID, data: schemas.StudentCreate
-    ) -> Student:
+    async def create_student(self, school_id: UUID, data: schemas.StudentCreate) -> Student:
         if not data.allow_duplicate:
             hits = await self._repo.find_duplicates(
                 school_id,
@@ -121,17 +119,20 @@ class PeopleService:
                 "Student was modified by someone else; reload and retry",
             )
         for field in (
-            "first_name", "middle_name", "last_name", "dob", "sex",
-            "admission_no", "system_id",
+            "first_name",
+            "middle_name",
+            "last_name",
+            "dob",
+            "sex",
+            "admission_no",
+            "system_id",
         ):
             value = getattr(data, field)
             if value is not None:
                 setattr(student, field, value)
         return await self._repo.update_student(student)
 
-    async def archive_student(
-        self, school_id: UUID, student_id: UUID, version: int
-    ) -> Student:
+    async def archive_student(self, school_id: UUID, student_id: UUID, version: int) -> Student:
         """Archive, never delete (spec §6). Enrolments and any results
         attached to them are untouched — that is the history invariant."""
         student = await self.get_student(school_id, student_id)

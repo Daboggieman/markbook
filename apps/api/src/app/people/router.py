@@ -5,6 +5,7 @@ or `require_with_scope` (route-coverage guard). Routes reading tenant data
 use `get_actor_db`, which sets the RLS tenant context from the JWT — plain
 `get_db` leaves it unset and RLS then hides every row.
 """
+# ruff: noqa: B008  — Depends(require(...)) in defaults is the FastAPI idiom.
 
 from typing import Annotated
 from uuid import UUID
@@ -29,9 +30,7 @@ async def list_students(
     session=Depends(get_actor_db),
     session_id: UUID | None = Query(default=None),
     class_id: UUID | None = Query(default=None),
-    status: str | None = Query(
-        default=None, pattern="^(active|graduated|withdrawn|archived)$"
-    ),
+    status: str | None = Query(default=None, pattern="^(active|graduated|withdrawn|archived)$"),
     q: Annotated[str | None, Query(max_length=100)] = None,
     limit: int = Query(default=50, ge=1, le=200),
 ) -> list[schemas.StudentResponse]:

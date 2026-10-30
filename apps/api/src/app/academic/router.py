@@ -4,15 +4,16 @@ HTTP layer only; logic in `academic.service`. Every route declares `require`
 (route-coverage guard); tenant-data routes use `get_actor_db` so the RLS
 context is set from the JWT.
 """
+# ruff: noqa: B008  — Depends(require(...)) in defaults is the FastAPI idiom.
 
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
-from app.access.dependency import get_actor_db, require
-from app.access.service import Actor
 from app.academic import schemas
 from app.academic.service import AcademicService
+from app.access.dependency import get_actor_db, require
+from app.access.service import Actor
 
 router = APIRouter(tags=["academic"])
 

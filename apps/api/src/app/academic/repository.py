@@ -170,9 +170,7 @@ class AcademicRepository:
 
     async def get_enrolment(self, school_id: UUID, enrolment_id: UUID) -> Enrolment | None:
         result = await self._s.execute(
-            select(Enrolment).where(
-                Enrolment.school_id == school_id, Enrolment.id == enrolment_id
-            )
+            select(Enrolment).where(Enrolment.school_id == school_id, Enrolment.id == enrolment_id)
         )
         return result.scalar_one_or_none()
 
