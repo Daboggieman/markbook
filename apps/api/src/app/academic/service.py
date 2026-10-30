@@ -293,6 +293,10 @@ class AcademicService:
                     )
                 )
                 continue
+            # Capture the id before the savepoint: a rollback expires the
+            # enrolment object, and async SQLAlchemy cannot lazily refresh it
+            # in the except handlers below.
+            enrolment_id = enrolment.id
             try:
                 async with self._s.begin_nested():
                     outcome = await self._apply_decision(
@@ -312,7 +316,7 @@ class AcademicService:
                     schemas.PromotionRunOutcome(
                         student_id=decision.student_id,
                         decision=decision.decision,
-                        from_enrolment_id=enrolment.id,
+                        from_enrolment_id=enrolment_id,
                         to_enrolment_id=None,
                         to_class_id=None,
                         note=exc.detail,
@@ -323,7 +327,7 @@ class AcademicService:
                     schemas.PromotionRunOutcome(
                         student_id=decision.student_id,
                         decision=decision.decision,
-                        from_enrolment_id=enrolment.id,
+                        from_enrolment_id=enrolment_id,
                         to_enrolment_id=None,
                         to_class_id=None,
                         note="already enrolled in the target session; skipped",

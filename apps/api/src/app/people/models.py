@@ -32,8 +32,12 @@ if TYPE_CHECKING:
 
 
 def uuid7() -> uuid.UUID:
-    """Time-ordered UUIDv7 (spec §6 convention; index-friendly)."""
-    from uuid7 import uuid7 as _uuid7
+    """Time-ordered UUIDv7 (spec §6 convention; index-friendly).
+
+    The `uuid7` distribution (pyproject) installs as the module
+    `uuid_extensions`, not `uuid7` — hence the import path.
+    """
+    from uuid_extensions import uuid7 as _uuid7
 
     return uuid.UUID(str(_uuid7()))
 

@@ -1,6 +1,6 @@
-"""Phase 2 academic tests — promotion invariant, enrolment rules.
+﻿"""Phase 2 academic tests â€” promotion invariant, enrolment rules.
 
-The promotion test is the historical-context exit criterion (spec §6.3):
+The promotion test is the historical-context exit criterion (spec Â§6.3):
 the old enrolment keeps its row, its stamp and its subject_enrolments; the
 new enrolment is a separate row in the new session.
 """
@@ -33,12 +33,14 @@ async def maker(migrated_url: str):
 
 
 async def _enrolled_student(maker: async_sessionmaker) -> tuple[UUID, dict, Student]:
-    """One school, structure, student, live JSS 1 enrolment with subject rows."""
+    """One school, structure, student, live JSS 1 enrolment with subject rows,
+    plus a real user id for decided_by (promotion_records FK)."""
     school = await _seed.seed_school(maker)
     ids = await _seed.seed_structure(maker, school)
     student = await _seed.seed_student(maker, school)
     await _seed.seed_enrolment(maker, school, student.id, ids["from_session_id"], ids["jss1_id"])
-    return school, ids, student
+    decider = await _seed.seed_teacher_user(maker, school)
+    return school, ids, student, decider
 
 
 def _run_request(ids: dict, *decisions: PromotionDecision) -> PromotionRunRequest:
@@ -52,14 +54,14 @@ def _run_request(ids: dict, *decisions: PromotionDecision) -> PromotionRunReques
 async def test_promotion_keeps_old_results_context(maker: async_sessionmaker) -> None:
     """Old enrolment: stamped 'promoted', subject_enrolments intact. New
     enrolment: separate row in the to-session with fresh subject rows."""
-    school, ids, student = await _enrolled_student(maker)
+    school, ids, student, decider = await _enrolled_student(maker)
 
     async with maker() as session:
         svc = AcademicService(session)
         result = await svc.run_promotion(
             school,
             _run_request(ids, PromotionDecision(student_id=student.id, decision="promote")),
-            decided_by=uuid4(),
+            decided_by=decider,
         )
         await session.commit()
 
@@ -119,13 +121,13 @@ async def test_promotion_keeps_old_results_context(maker: async_sessionmaker) ->
 
 
 async def test_repeat_keeps_same_class(maker: async_sessionmaker) -> None:
-    school, ids, student = await _enrolled_student(maker)
+    school, ids, student, decider = await _enrolled_student(maker)
     async with maker() as session:
         svc = AcademicService(session)
         result = await svc.run_promotion(
             school,
             _run_request(ids, PromotionDecision(student_id=student.id, decision="repeat")),
-            decided_by=uuid4(),
+            decided_by=decider,
         )
         await session.commit()
     outcome = result.outcomes[0]
@@ -142,13 +144,13 @@ async def test_repeat_keeps_same_class(maker: async_sessionmaker) -> None:
 async def test_graduate_closes_out_without_new_enrolment(
     maker: async_sessionmaker,
 ) -> None:
-    school, ids, student = await _enrolled_student(maker)
+    school, ids, student, decider = await _enrolled_student(maker)
     async with maker() as session:
         svc = AcademicService(session)
         result = await svc.run_promotion(
             school,
             _run_request(ids, PromotionDecision(student_id=student.id, decision="graduate")),
-            decided_by=uuid4(),
+            decided_by=decider,
         )
         await session.commit()
     outcome = result.outcomes[0]
@@ -182,8 +184,8 @@ async def test_promote_from_last_class_notes_no_successor(
 ) -> None:
     """Auto-advance from the final class in the sequence cannot promote; the
     outcome carries the note and the old enrolment stays live."""
-    school, ids, student = await _enrolled_student(maker)
-    # Move the student to JSS 2 — the last class in the seeded sequence.
+    school, ids, student, decider = await _enrolled_student(maker)
+    # Move the student to JSS 2 â€” the last class in the seeded sequence.
     async with maker() as s:
         enrol = (
             await s.execute(select(Enrolment).where(Enrolment.student_id == student.id))
@@ -196,7 +198,7 @@ async def test_promote_from_last_class_notes_no_successor(
         result = await svc.run_promotion(
             school,
             _run_request(ids, PromotionDecision(student_id=student.id, decision="promote")),
-            decided_by=uuid4(),
+            decided_by=decider,
         )
         await session.commit()
     outcome = result.outcomes[0]
@@ -209,14 +211,14 @@ async def test_promote_from_last_class_notes_no_successor(
 
 
 async def test_skip_when_no_live_enrolment(maker: async_sessionmaker) -> None:
-    school, ids, _student = await _enrolled_student(maker)
+    school, ids, _student, _decider = await _enrolled_student(maker)
     stranger = await _seed.seed_student(maker, school, first_name="Ngozi", last_name="Eze")
     async with maker() as session:
         svc = AcademicService(session)
         result = await svc.run_promotion(
             school,
             _run_request(ids, PromotionDecision(student_id=stranger.id, decision="promote")),
-            decided_by=uuid4(),
+            decided_by=decider,
         )
         await session.commit()
     assert result.outcomes[0].from_enrolment_id is None
@@ -225,8 +227,8 @@ async def test_skip_when_no_live_enrolment(maker: async_sessionmaker) -> None:
 
 async def test_second_live_enrolment_conflicts(maker: async_sessionmaker) -> None:
     """ux_enrolments_student_session: one live enrolment per student per
-    session (spec §6.3)."""
-    school, ids, student = await _enrolled_student(maker)
+    session (spec Â§6.3)."""
+    school, ids, student, decider = await _enrolled_student(maker)
     async with maker() as session:
         svc = AcademicService(session)
         with pytest.raises(ProblemError) as exc_info:
@@ -242,7 +244,7 @@ async def test_second_live_enrolment_conflicts(maker: async_sessionmaker) -> Non
 
 
 async def test_enrol_creates_subject_enrolments(maker: async_sessionmaker) -> None:
-    school, ids, _student = await _enrolled_student(maker)
+    school, ids, _student, _decider = await _enrolled_student(maker)
     newbie = await _seed.seed_student(maker, school, first_name="Obi", last_name="Nwachukwu")
     async with maker() as session:
         svc = AcademicService(session)
