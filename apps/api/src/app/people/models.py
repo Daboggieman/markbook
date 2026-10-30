@@ -7,6 +7,7 @@ trigram index created by migration 0003.
 
 import uuid
 from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -25,6 +26,9 @@ from sqlalchemy.dialects.postgresql import CITEXT, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.platform.models import Base
+
+if TYPE_CHECKING:
+    from app.academic.models import Enrolment
 
 
 def uuid7() -> uuid.UUID:
