@@ -143,6 +143,9 @@ class AcademicService:
     async def list_subjects(self, school_id: UUID) -> list[Subject]:
         return await self._repo.list_subjects(school_id)
 
+    async def list_class_subjects(self, class_id: UUID) -> list[ClassSubject]:
+        return await self._repo.list_class_subjects(class_id)
+
     async def create_class_subject(
         self, school_id: UUID, data: schemas.ClassSubjectCreate
     ) -> ClassSubject:
@@ -249,6 +252,13 @@ class AcademicService:
             raise ProblemError(
                 CONFLICT, "Assignment references a missing teacher user"
             ) from exc
+
+    async def list_teacher_assignments(
+        self, school_id: UUID, teacher_user_id: UUID, session_id: UUID
+    ) -> list[TeacherAssignment]:
+        return await self._repo.list_teacher_assignments(
+            school_id, teacher_user_id, session_id
+        )
 
     # ---- promotions ----------------------------------------------------------------------
 
