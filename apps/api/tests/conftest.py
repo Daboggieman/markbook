@@ -72,8 +72,13 @@ async def two_schools(migrated_url: str) -> AsyncIterator[tuple[UUID, UUID]]:
     """Two schools in the migrated baseline DB, for RLS isolation tests."""
     engine = create_async_engine(migrated_url)
     async with engine.begin() as conn:
+        # ON CONFLICT: any test file may request this fixture; a second call
+        # in the same session must not collide with the first.
         await conn.execute(
-            text("INSERT INTO schools (id, name) VALUES (:id, :name), (:id2, :name2)").bindparams(
+            text(
+                "INSERT INTO schools (id, name) VALUES (:id, :name), (:id2, :name2) "
+                "ON CONFLICT (id) DO NOTHING"
+            ).bindparams(
                 id=SEED_SCHOOL_A,
                 name="School A",
                 id2=SEED_SCHOOL_B,

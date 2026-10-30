@@ -4,17 +4,16 @@ Runs against real Postgres via testcontainers (`db` marker); the connection
 is the table owner/superuser, so RLS is not exercised here (tests/security/).
 """
 
-from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from tests.db import _seed
 
 from app.academic.models import Enrolment, Section, SubjectEnrolment, TeacherAssignment
 from app.people.schemas import DuplicateCheckRequest, StudentCreate
 from app.people.service import PeopleService
 from app.platform.errors import POSSIBLE_DUPLICATE, ProblemError
-from tests.db import _seed
 
 pytestmark = pytest.mark.db
 
@@ -51,10 +50,14 @@ async def test_archive_preserves_history(maker: async_sessionmaker) -> None:
         assert enrol.status == "enrolled", "archive must not touch enrolments"
         assert enrol.class_id == ids["jss1_id"]
         subject_rows = (
-            await s.execute(
-                select(SubjectEnrolment).where(SubjectEnrolment.enrolment_id == enrolment.id)
+            (
+                await s.execute(
+                    select(SubjectEnrolment).where(SubjectEnrolment.enrolment_id == enrolment.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(subject_rows) == 1, "subject enrolments survive the archive"
 
 
@@ -97,9 +100,7 @@ async def test_check_duplicates_reports_similar_names(maker: async_sessionmaker)
     school = await _seed.seed_school(maker)
     async with maker() as session:
         svc = PeopleService(session)
-        await svc.create_student(
-            school, _create_request(first_name="Adaeze", last_name="Okafor")
-        )
+        await svc.create_student(school, _create_request(first_name="Adaeze", last_name="Okafor"))
         await session.commit()
 
     async with maker() as session:
@@ -125,9 +126,7 @@ async def test_scoped_list_respects_teacher_assignments(
     outsider = await _seed.seed_student(maker, school, first_name="Zuri", last_name="Abbas")
     for sid in (s1.id, s2.id):
         await _seed.seed_enrolment(maker, school, sid, ids["from_session_id"], ids["jss1_id"])
-    await _seed.seed_enrolment(
-        maker, school, outsider.id, ids["from_session_id"], ids["jss2_id"]
-    )
+    await _seed.seed_enrolment(maker, school, outsider.id, ids["from_session_id"], ids["jss2_id"])
 
     async with maker() as session:
         session.add(
@@ -158,9 +157,7 @@ async def test_scoped_list_respects_teacher_assignments(
         )
         assert {s.id for s in everyone} == {s1.id, s2.id, outsider.id}
 
-        own_scope = await svc.list_students(
-            scope="own", school_id=school, teacher_user_id=teacher
-        )
+        own_scope = await svc.list_students(scope="own", school_id=school, teacher_user_id=teacher)
         assert own_scope == []
 
 

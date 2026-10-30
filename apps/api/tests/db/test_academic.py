@@ -5,17 +5,22 @@ the old enrolment keeps its row, its stamp and its subject_enrolments; the
 new enrolment is a separate row in the new session.
 """
 
+from uuid import UUID, uuid4
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from tests.db import _seed
 
 from app.academic.models import Enrolment, PromotionRecord, SubjectEnrolment
-from app.academic.schemas import PromotionDecision, PromotionRunRequest
+from app.academic.schemas import (
+    EnrolmentCreate,
+    PromotionDecision,
+    PromotionRunRequest,
+)
 from app.academic.service import AcademicService
-from app.people.schemas import StudentCreate
-from app.people.service import PeopleService
+from app.people.models import Student
 from app.platform.errors import CONFLICT, ProblemError
-from tests.db import _seed
 
 pytestmark = pytest.mark.db
 
@@ -27,17 +32,21 @@ async def maker(migrated_url: str):
     await engine.dispose()
 
 
-async def _enrolled_student(
-    maker: async_sessionmaker,
-) -> tuple:
+async def _enrolled_student(maker: async_sessionmaker) -> tuple[UUID, dict, Student]:
     """One school, structure, student, live JSS 1 enrolment with subject rows."""
     school = await _seed.seed_school(maker)
     ids = await _seed.seed_structure(maker, school)
     student = await _seed.seed_student(maker, school)
-    await _seed.seed_enrolment(
-        maker, school, student.id, ids["from_session_id"], ids["jss1_id"]
-    )
+    await _seed.seed_enrolment(maker, school, student.id, ids["from_session_id"], ids["jss1_id"])
     return school, ids, student
+
+
+def _run_request(ids: dict, *decisions: PromotionDecision) -> PromotionRunRequest:
+    return PromotionRunRequest(
+        from_session_id=ids["from_session_id"],
+        to_session_id=ids["to_session_id"],
+        decisions=list(decisions),
+    )
 
 
 async def test_promotion_keeps_old_results_context(maker: async_sessionmaker) -> None:
@@ -49,11 +58,7 @@ async def test_promotion_keeps_old_results_context(maker: async_sessionmaker) ->
         svc = AcademicService(session)
         result = await svc.run_promotion(
             school,
-            PromotionRunRequest(
-                from_session_id=ids["from_session_id"],
-                to_session_id=ids["to_session_id"],
-                decisions=[PromotionDecision(student_id=student.id, decision="promote")],
-            ),
+            _run_request(ids, PromotionDecision(student_id=student.id, decision="promote")),
             decided_by=uuid4(),
         )
         await session.commit()
@@ -72,10 +77,14 @@ async def test_promotion_keeps_old_results_context(maker: async_sessionmaker) ->
         assert old.status == "promoted"
         assert old.ended_on is not None
         old_subjects = (
-            await s.execute(
-                select(SubjectEnrolment).where(SubjectEnrolment.enrolment_id == old.id)
+            (
+                await s.execute(
+                    select(SubjectEnrolment).where(SubjectEnrolment.enrolment_id == old.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(old_subjects) == 1, "old subject enrolments are never touched"
 
         new = (
@@ -85,15 +94,25 @@ async def test_promotion_keeps_old_results_context(maker: async_sessionmaker) ->
         assert new.class_id == ids["jss2_id"]
         assert new.status == "enrolled"
         new_subjects = (
-            await s.execute(
-                select(SubjectEnrolment).where(SubjectEnrolment.enrolment_id == new.id)
+            (
+                await s.execute(
+                    select(SubjectEnrolment).where(SubjectEnrolment.enrolment_id == new.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(new_subjects) == 1, "fresh subject enrolments from the new class"
 
         records = (
-            await s.execute(select(PromotionRecord).where(PromotionRecord.student_id == student.id))
-        ).scalars().all()
+            (
+                await s.execute(
+                    select(PromotionRecord).where(PromotionRecord.student_id == student.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
         assert len(records) == 1
         assert records[0].from_enrolment_id == old.id
         assert records[0].to_enrolment_id == new.id
@@ -105,11 +124,7 @@ async def test_repeat_keeps_same_class(maker: async_sessionmaker) -> None:
         svc = AcademicService(session)
         result = await svc.run_promotion(
             school,
-            PromotionRunRequest(
-                from_session_id=ids["from_session_id"],
-                to_session_id=ids["to_session_id"],
-                decisions=[PromotionDecision(student_id=student.id, decision="repeat")],
-            ),
+            _run_request(ids, PromotionDecision(student_id=student.id, decision="repeat")),
             decided_by=uuid4(),
         )
         await session.commit()
@@ -132,11 +147,7 @@ async def test_graduate_closes_out_without_new_enrolment(
         svc = AcademicService(session)
         result = await svc.run_promotion(
             school,
-            PromotionRunRequest(
-                from_session_id=ids["from_session_id"],
-                to_session_id=ids["to_session_id"],
-                decisions=[PromotionDecision(student_id=student.id, decision="graduate")],
-            ),
+            _run_request(ids, PromotionDecision(student_id=student.id, decision="graduate")),
             decided_by=uuid4(),
         )
         await session.commit()
@@ -150,42 +161,51 @@ async def test_graduate_closes_out_without_new_enrolment(
         ).scalar_one()
         assert old.status == "graduated"
         live = (
-            await s.execute(
-                select(Enrolment).where(
-                    Enrolment.student_id == student.id,
-                    Enrolment.session_id == ids["to_session_id"],
+            (
+                await s.execute(
+                    select(Enrolment).where(
+                        Enrolment.student_id == student.id,
+                        Enrolment.session_id == ids["to_session_id"],
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert live == [], "graduate creates no new enrolment"
-        student_status = (
-            await s.execute(select(Student).where(Student.id == student.id))
-        ).scalar_one()
-        assert student_status.status == "graduated"
+        row = (await s.execute(select(Student).where(Student.id == student.id))).scalar_one()
+        assert row.status == "graduated"
 
 
-async def test_promote_without_successor_notes_error(maker: async_sessionmaker) -> None:
-    """Auto-advance from the last class in the sequence cannot promote."""
+async def test_promote_from_last_class_notes_no_successor(
+    maker: async_sessionmaker,
+) -> None:
+    """Auto-advance from the final class in the sequence cannot promote; the
+    outcome carries the note and the old enrolment stays live."""
     school, ids, student = await _enrolled_student(maker)
+    # Move the student to JSS 2 — the last class in the seeded sequence.
+    async with maker() as s:
+        enrol = (
+            await s.execute(select(Enrolment).where(Enrolment.student_id == student.id))
+        ).scalar_one()
+        enrol.class_id = ids["jss2_id"]
+        await s.commit()
+
     async with maker() as session:
         svc = AcademicService(session)
         result = await svc.run_promotion(
             school,
-            PromotionRunRequest(
-                from_session_id=ids["from_session_id"],
-                to_session_id=ids["to_session_id"],
-                decisions=[
-                    PromotionDecision(student_id=student.id, decision="promote",
-                                      to_class_id=ids["jss2_id"])
-                ],
-            ),
+            _run_request(ids, PromotionDecision(student_id=student.id, decision="promote")),
             decided_by=uuid4(),
         )
         await session.commit()
-    # Explicit to_class bypasses the sequence check, so this succeeds —
-    # verify instead that a student in the final class gets a note.
     outcome = result.outcomes[0]
-    assert outcome.decision == "promoted"
+    assert outcome.note is not None and "graduate" in outcome.note
+    async with maker() as s:
+        enrol = (
+            await s.execute(select(Enrolment).where(Enrolment.student_id == student.id))
+        ).scalar_one()
+        assert enrol.status == "enrolled", "failed decision leaves the enrolment live"
 
 
 async def test_skip_when_no_live_enrolment(maker: async_sessionmaker) -> None:
@@ -195,11 +215,7 @@ async def test_skip_when_no_live_enrolment(maker: async_sessionmaker) -> None:
         svc = AcademicService(session)
         result = await svc.run_promotion(
             school,
-            PromotionRunRequest(
-                from_session_id=ids["from_session_id"],
-                to_session_id=ids["to_session_id"],
-                decisions=[PromotionDecision(student_id=stranger.id, decision="promote")],
-            ),
+            _run_request(ids, PromotionDecision(student_id=stranger.id, decision="promote")),
             decided_by=uuid4(),
         )
         await session.commit()
@@ -216,7 +232,7 @@ async def test_second_live_enrolment_conflicts(maker: async_sessionmaker) -> Non
         with pytest.raises(ProblemError) as exc_info:
             await svc.enrol_student(
                 school,
-                EnrolmentCreateShim(
+                EnrolmentCreate(
                     student_id=student.id,
                     session_id=ids["from_session_id"],
                     class_id=ids["jss2_id"],
@@ -232,7 +248,7 @@ async def test_enrol_creates_subject_enrolments(maker: async_sessionmaker) -> No
         svc = AcademicService(session)
         enrolment = await svc.enrol_student(
             school,
-            EnrolmentCreateShim(
+            EnrolmentCreate(
                 student_id=newbie.id,
                 session_id=ids["from_session_id"],
                 class_id=ids["jss1_id"],
@@ -240,14 +256,12 @@ async def test_enrol_creates_subject_enrolments(maker: async_sessionmaker) -> No
         )
         await session.commit()
         subject_rows = (
-            await session.execute(
-                select(SubjectEnrolment).where(SubjectEnrolment.enrolment_id == enrolment.id)
+            (
+                await session.execute(
+                    select(SubjectEnrolment).where(SubjectEnrolment.enrolment_id == enrolment.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(subject_rows) == 1
-
-
-from uuid import uuid4  # noqa: E402  (used above; placed here intentionally? no — fix below)
-
-from app.academic.schemas import EnrolmentCreate as EnrolmentCreateShim  # noqa: E402
-from app.people.models import Student  # noqa: E402

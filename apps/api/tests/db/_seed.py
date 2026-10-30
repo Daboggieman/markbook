@@ -103,8 +103,10 @@ async def seed_enrolment(
         s.add(enrolment)
         await s.flush()
         class_subjects = (
-            await s.execute(select(ClassSubject).where(ClassSubject.class_id == class_id))
-        ).scalars().all()
+            (await s.execute(select(ClassSubject).where(ClassSubject.class_id == class_id)))
+            .scalars()
+            .all()
+        )
         for cs in class_subjects:
             s.add(
                 SubjectEnrolment(
