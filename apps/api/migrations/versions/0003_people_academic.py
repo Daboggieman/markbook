@@ -259,7 +259,10 @@ def _upgrade() -> None:
     )
     op.execute("CREATE INDEX ix_enrolments_school_id ON enrolments (school_id)")
     op.execute("CREATE INDEX ix_enrolments_student_id ON enrolments (student_id)")
-    op.execute("CREATE INDEX ix_enrolments_session_class ON enrolments (school_id, session_id, class_id)")
+    op.execute(
+        "CREATE INDEX ix_enrolments_session_class "
+        "ON enrolments (school_id, session_id, class_id)"
+    )
 
     op.execute(
         """
@@ -356,8 +359,9 @@ def _upgrade() -> None:
         ("00000000-0000-7000-8000-000000000104", "SS", 3),
     ]
     for level_id, name, ordinal in level_rows:
+        # Seed literals only (fixed tuples above) — no external input; S608 false positive.
         op.execute(
-            f"INSERT INTO educational_levels (id, school_id, name, ordinal) "
+            f"INSERT INTO educational_levels (id, school_id, name, ordinal) "  # noqa: S608
             f"VALUES ('{level_id}', '{seed_school}', '{name}', {ordinal}) "
             f"ON CONFLICT (school_id, name) DO NOTHING"
         )
@@ -380,8 +384,9 @@ def _upgrade() -> None:
         ("SS 3", "00000000-0000-7000-8000-000000000104", 3),
     ]
     for name, level_id, ordinal in classes_seed:
+        # Seed literals only (fixed tuples above) — no external input; S608 false positive.
         op.execute(
-            f"INSERT INTO classes (id, school_id, level_id, name, ordinal) "
+            f"INSERT INTO classes (id, school_id, level_id, name, ordinal) "  # noqa: S608
             f"VALUES (gen_random_uuid(), '{seed_school}', '{level_id}', '{name}', {ordinal}) "
             f"ON CONFLICT (school_id, name) DO NOTHING"
         )

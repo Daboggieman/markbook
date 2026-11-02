@@ -5,12 +5,11 @@ the old enrolment keeps its row, its stamp and its subject_enrolments; the
 new enrolment is a separate row in the new session.
 """
 
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from tests.db import _seed
 
 from app.academic.models import Enrolment, PromotionRecord, SubjectEnrolment
 from app.academic.schemas import (
@@ -21,6 +20,7 @@ from app.academic.schemas import (
 from app.academic.service import AcademicService
 from app.people.models import Student
 from app.platform.errors import CONFLICT, ProblemError
+from tests.db import _seed
 
 pytestmark = pytest.mark.db
 
@@ -218,7 +218,7 @@ async def test_skip_when_no_live_enrolment(maker: async_sessionmaker) -> None:
         result = await svc.run_promotion(
             school,
             _run_request(ids, PromotionDecision(student_id=stranger.id, decision="promote")),
-            decided_by=decider,
+            decided_by=_decider,
         )
         await session.commit()
     assert result.outcomes[0].from_enrolment_id is None

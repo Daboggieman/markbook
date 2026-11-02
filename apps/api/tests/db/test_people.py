@@ -8,12 +8,12 @@ is the table owner/superuser, so RLS is not exercised here (tests/security/).
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from tests.db import _seed
 
 from app.academic.models import Enrolment, Section, SubjectEnrolment, TeacherAssignment
 from app.people.schemas import DuplicateCheckRequest, StudentCreate
 from app.people.service import PeopleService
 from app.platform.errors import POSSIBLE_DUPLICATE, ProblemError
+from tests.db import _seed
 
 pytestmark = pytest.mark.db
 
