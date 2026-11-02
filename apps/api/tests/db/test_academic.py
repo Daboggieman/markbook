@@ -1,6 +1,6 @@
-﻿"""Phase 2 academic tests â€” promotion invariant, enrolment rules.
+"""Phase 2 academic tests — promotion invariant, enrolment rules.
 
-The promotion test is the historical-context exit criterion (spec Â§6.3):
+The promotion test is the historical-context exit criterion (spec §6.3):
 the old enrolment keeps its row, its stamp and its subject_enrolments; the
 new enrolment is a separate row in the new session.
 """
@@ -32,7 +32,7 @@ async def maker(migrated_url: str):
     await engine.dispose()
 
 
-async def _enrolled_student(maker: async_sessionmaker) -> tuple[UUID, dict, Student]:
+async def _enrolled_student(maker: async_sessionmaker) -> tuple[UUID, dict, Student, UUID]:
     """One school, structure, student, live JSS 1 enrolment with subject rows,
     plus a real user id for decided_by (promotion_records FK)."""
     school = await _seed.seed_school(maker)
@@ -185,7 +185,7 @@ async def test_promote_from_last_class_notes_no_successor(
     """Auto-advance from the final class in the sequence cannot promote; the
     outcome carries the note and the old enrolment stays live."""
     school, ids, student, decider = await _enrolled_student(maker)
-    # Move the student to JSS 2 â€” the last class in the seeded sequence.
+    # Move the student to JSS 2 — the last class in the seeded sequence.
     async with maker() as s:
         enrol = (
             await s.execute(select(Enrolment).where(Enrolment.student_id == student.id))
@@ -227,7 +227,7 @@ async def test_skip_when_no_live_enrolment(maker: async_sessionmaker) -> None:
 
 async def test_second_live_enrolment_conflicts(maker: async_sessionmaker) -> None:
     """ux_enrolments_student_session: one live enrolment per student per
-    session (spec Â§6.3)."""
+    session (spec §6.3)."""
     school, ids, student, decider = await _enrolled_student(maker)
     async with maker() as session:
         svc = AcademicService(session)

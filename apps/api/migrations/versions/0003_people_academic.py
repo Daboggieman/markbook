@@ -34,9 +34,7 @@ def _upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
 
     # --- enum types -------------------------------------------------------
-    op.execute(
-        "CREATE TYPE studentstatus AS ENUM ('active', 'graduated', 'withdrawn', 'archived')"
-    )
+    op.execute("CREATE TYPE studentstatus AS ENUM ('active', 'graduated', 'withdrawn', 'archived')")
     op.execute(
         "CREATE TYPE enrolmentstatus AS ENUM "
         "('enrolled','promoted','repeated','graduated','withdrawn')"
@@ -260,8 +258,7 @@ def _upgrade() -> None:
     op.execute("CREATE INDEX ix_enrolments_school_id ON enrolments (school_id)")
     op.execute("CREATE INDEX ix_enrolments_student_id ON enrolments (student_id)")
     op.execute(
-        "CREATE INDEX ix_enrolments_session_class "
-        "ON enrolments (school_id, session_id, class_id)"
+        "CREATE INDEX ix_enrolments_session_class ON enrolments (school_id, session_id, class_id)"
     )
 
     op.execute(
@@ -276,9 +273,7 @@ def _upgrade() -> None:
         )
         """
     )
-    op.execute(
-        "CREATE INDEX ix_subject_enrolments_school_id ON subject_enrolments (school_id)"
-    )
+    op.execute("CREATE INDEX ix_subject_enrolments_school_id ON subject_enrolments (school_id)")
 
     # --- teacher assignments ---------------------------------------------
     op.execute(
@@ -318,9 +313,7 @@ def _upgrade() -> None:
         """
     )
     op.execute("CREATE INDEX ix_promotion_records_school_id ON promotion_records (school_id)")
-    op.execute(
-        "CREATE INDEX ix_promotion_records_student ON promotion_records (student_id)"
-    )
+    op.execute("CREATE INDEX ix_promotion_records_student ON promotion_records (student_id)")
 
     # --- RLS --------------------------------------------------------------
     # sessions: no RLS — the refresh token hash IS the bearer credential.

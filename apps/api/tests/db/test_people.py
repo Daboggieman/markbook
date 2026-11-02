@@ -4,7 +4,6 @@ Runs against real Postgres via testcontainers (`db` marker); the connection
 is the table owner/superuser, so RLS is not exercised here (tests/security/).
 """
 
-
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
