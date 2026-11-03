@@ -77,6 +77,14 @@ async def _insert_student_and_enrolment(url: str, school_id, tag: str) -> None:
         student_id = uuid4()
         enrolment_id = uuid4()
         now = datetime.now(UTC)
+        # The school row must exist: every tenant table FKs school_id. For
+        # two_schools callers this is a no-op (ON CONFLICT); the unset-context
+        # test passes a fresh uuid4 and needs it created here.
+        await conn.execute(
+            text(
+                "INSERT INTO schools (id, name) VALUES (:s, :tag) ON CONFLICT (id) DO NOTHING"
+            ).bindparams(s=school_id, tag=tag)
+        )
         await conn.execute(
             text(
                 "INSERT INTO educational_levels (id, school_id, name, ordinal) "
