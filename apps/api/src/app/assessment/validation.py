@@ -8,6 +8,7 @@ the last line of defence behind it.
 """
 
 from app.assessment.schemas import ComponentDef, ScoreRowInput
+from app.platform.errors import VALIDATION_ERROR, ProblemError
 
 SCORE_STATUSES = ("entered", "absent", "exempt", "missing")
 
@@ -23,5 +24,23 @@ def validate_score_row(row: ScoreRowInput, component: ComponentDef) -> None:
        CHECK — a genuine zero is ('entered', Decimal('0.00'))).
     3. entered values are within 0..max_score inclusive.
     """
-    # TODO(human): implement the rules above.
-    raise NotImplementedError
+    if row.status not in SCORE_STATUSES:
+        raise ProblemError(VALIDATION_ERROR, f"Unknown score status: {row.status!r}")
+
+    if row.status == "entered":
+        if row.value is None:
+            raise ProblemError(
+                VALIDATION_ERROR,
+                f"Component {component.key}: status 'entered' requires a value",
+            )
+        if row.value < 0 or row.value > component.max_score:
+            raise ProblemError(
+                VALIDATION_ERROR,
+                f"Component {component.key}: value {row.value} is outside "
+                f"0..{component.max_score}",
+            )
+    elif row.value is not None:
+        raise ProblemError(
+            VALIDATION_ERROR,
+            f"Component {component.key}: status {row.status!r} must not carry a value",
+        )

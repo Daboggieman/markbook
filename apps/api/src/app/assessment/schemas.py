@@ -137,3 +137,59 @@ class ScoreChangeResponse(BaseModel):
     reason: str | None
     changed_at: datetime
     source: str
+
+
+# ---------------------------------------------------------------------------
+# Score sheet & bulk import
+# ---------------------------------------------------------------------------
+
+
+class ScoreCell(BaseModel):
+    """One entered cell on the sheet (from the scores table)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: ScoreStatus
+    value: Decimal | None
+    version: int
+
+
+class SheetRow(BaseModel):
+    """One student on the score sheet: roster identity plus any scores."""
+
+    subject_enrolment_id: UUID
+    student_id: UUID
+    student_name: str
+    admission_no: str
+    scores: dict[str, ScoreCell] = {}
+
+
+class ScoreSheetResponse(BaseModel):
+    assessment_id: UUID
+    workflow_state: str
+    components: list[ComponentDef]
+    rows: list[SheetRow]
+
+
+class ImportScoresRequest(BaseModel):
+    """CSV text: header `subject_enrolment_id,component_key,status,value`
+    (value only on entered rows). The worker validates row by row."""
+
+    csv: Annotated[str, Field(min_length=1)]
+
+
+class JobResponse(BaseModel):
+    """Job status. In Phase 3 assessment is the only job producer, so the
+    route lives on this module's router; it moves to a shared home when a
+    second producer appears (jobs belong to no module — platform table)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    type: str
+    status: str
+    result: dict[str, Any] | None
+    error: str | None
+    created_at: datetime
+    finished_at: datetime | None
