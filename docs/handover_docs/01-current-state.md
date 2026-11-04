@@ -1,9 +1,9 @@
 # Current state — 2026-11-02
 
-> **Working branch: `markbook_phase_2`** (cut from `markbook_phase_1` tip; Phase 2 commits
-> 2026-10-28 → 2026-10-30, plus the 2026-11-02 gate repair). Phase 1 lives on
+> **Working branch: `markbook_phase_3`** (cut from the `markbook_phase_2` tip `f1a5b97`,
+> 2026-11-02, at Phase 3 start). Phase 2 lives on `markbook_phase_2`; Phase 1 on
 > `markbook_phase_1`; Phase 0 on `markbook_phase_0` / `master` (PR #1).
-> Next: cut `markbook_phase_3` from the `markbook_phase_2` tip when Phase 3 starts.
+> Next: cut `markbook_phase_4` from the `markbook_phase_3` tip when Phase 4 starts.
 
 ## Phase board
 
@@ -12,7 +12,7 @@
 | 0 — Foundations | ✅ **COMPLETE** | 2026-10-25 | All exit criteria verified live (compose, health, migrations, RLS); CI push pending |
 | 1 — Identity, access, audit | ✅ **COMPLETE** | 2026-10-27 | All exit criteria verified live: full suite 68 passed (incl. 10 testcontainer tests), ruff/mypy clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 2 — People and academic structure | ✅ **COMPLETE** | 2026-11-02 | All exit criteria verified live: full suite **83 passed** (incl. 25 testcontainer tests), ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
-| 3 — Assessment templates and score entry | not started | — | |
+| 3 — Assessment templates and score entry | 🚧 **IN PROGRESS** | — | Started 2026-11-02 on `markbook_phase_3`; verification step: all seven deliverables Missing (greenfield), foundation platform/access/academic/audit all Done |
 | 4 — Calculation engine and processing | not started | — | |
 | 5 — Workflow, locking, publication, documents | not started | — | |
 | 6 — Web client | not started | — | |
