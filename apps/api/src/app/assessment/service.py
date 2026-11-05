@@ -426,18 +426,16 @@ class AssessmentService:
         row_errors: list[dict] = []
         valid: list[schemas.ScoreRowInput] = []
         seen: set[tuple[UUID, str]] = set()
-        for row in rows:
-            index = {"row": rows.index(row) + 1}  # replaced below by enumerate
+        for row_no, row in enumerate(rows, start=1):
             detail = self._row_problem(row, components, roster_ids, seen)
             if detail is None:
                 seen.add((row.subject_enrolment_id, row.component_key))
-                valid.append(row)
+                valid.append((row_no, row))
             else:
-                row_errors.append({**index, "detail": detail})
-        del index  # noqa: F821 — placeholder removed by enumerate rewrite below
+                row_errors.append({"row": row_no, "detail": detail})
 
         applied: list[Score] = []
-        for row in valid:
+        for row_no, row in valid:
             existing = await self._repo.get_score_for_cell(
                 school_id,
                 assessment_id=assessment.id,
@@ -448,7 +446,7 @@ class AssessmentService:
                 if row.base_version is not None:
                     row_errors.append(
                         {
-                            "row": rows.index(row) + 1,
+                            "row": row_no,
                             "detail": "Row carries a base_version but no score exists yet",
                         }
                     )
@@ -487,7 +485,7 @@ class AssessmentService:
                 if row.base_version is None:
                     row_errors.append(
                         {
-                            "row": rows.index(row) + 1,
+                            "row": row_no,
                             "detail": (
                                 "Score already exists; send its current version as "
                                 "base_version to overwrite"
@@ -498,7 +496,7 @@ class AssessmentService:
                 if row.base_version != existing.version:
                     row_errors.append(
                         {
-                            "row": rows.index(row) + 1,
+                            "row": row_no,
                             "detail": (
                                 f"Version conflict: base_version {row.base_version}, "
                                 f"current {existing.version}"
@@ -612,6 +610,14 @@ class AssessmentService:
         return await self._repo.list_score_changes(school_id, score_id)
 
     # ---- bulk import -------------------------------------------------------------
+
+    async def get_job(self, school_id: UUID, job_id: UUID) -> Job:
+        """The jobs table has no RLS (school_id is a data column there), so
+        the school predicate here is the caller-facing tenancy check."""
+        job = await self._s.get(Job, job_id)
+        if job is None or (job.school_id is not None and job.school_id != school_id):
+            raise ProblemError(NOT_FOUND, "Job not found", status=404)
+        return job
 
     async def enqueue_import(
         self,
