@@ -356,11 +356,15 @@ class AssessmentService:
             reason=reason,
         )
         if row_errors:
-            raise ProblemError(
-                VALIDATION_ERROR,
-                row_errors[0]["detail"],
-                extra={"errors": row_errors},
-            )
+            # A version conflict is a concurrency failure (409), not a
+            # validation failure (422): a batch whose errors are all
+            # base_version problems answers 409; anything else answers 422
+            # with every bad cell reported either way.
+            if all(e.get("code") == VERSION_CONFLICT for e in row_errors):
+                code = VERSION_CONFLICT
+            else:
+                code = VALIDATION_ERROR
+            raise ProblemError(code, row_errors[0]["detail"], extra={"errors": row_errors})
         return applied
 
     async def apply_import(
@@ -407,7 +411,9 @@ class AssessmentService:
         Returns (applied scores, row errors). Rows that fail validation or
         conflict are skipped with an error entry — never applied half-way;
         the caller decides whether errors mean "reject everything" (web) or
-        "report and continue" (import).
+        "report and continue" (import). Conflict entries carry
+        `"code": VERSION_CONFLICT` so the web path can answer 409 when
+        staleness, not validation, is the only problem.
         """
         version = await self._repo.get_version(school_id, assessment.template_version_id)
         if version is None:
@@ -453,6 +459,7 @@ class AssessmentService:
                     row_errors.append(
                         {
                             "row": row_no,
+                            "code": VERSION_CONFLICT,
                             "detail": "Row carries a base_version but no score exists yet",
                         }
                     )
@@ -492,6 +499,7 @@ class AssessmentService:
                     row_errors.append(
                         {
                             "row": row_no,
+                            "code": VERSION_CONFLICT,
                             "detail": (
                                 "Score already exists; send its current version as "
                                 "base_version to overwrite"
@@ -503,6 +511,7 @@ class AssessmentService:
                     row_errors.append(
                         {
                             "row": row_no,
+                            "code": VERSION_CONFLICT,
                             "detail": (
                                 f"Version conflict: base_version {row.base_version}, "
                                 f"current {existing.version}"

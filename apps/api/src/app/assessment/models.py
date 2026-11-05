@@ -40,6 +40,8 @@ WORKFLOW_STATES = (
     "locked",
     "published",
 )
+# The workflow states in which score cells may still be written (spec §6.4).
+EDITABLE_STATES = ("draft", "returned")
 SCORE_STATUSES = ("entered", "absent", "exempt", "missing")
 SCORE_CHANGE_SOURCES = ("web", "desktop_sync", "import")
 
@@ -135,8 +137,6 @@ class Assessment(Base):
         onupdate=lambda: datetime.now(UTC),
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-
-    EDITABLE_STATES = ("draft", "returned")
 
 
 class Score(Base):
