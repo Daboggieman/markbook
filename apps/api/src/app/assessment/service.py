@@ -351,7 +351,12 @@ class AssessmentService:
         assessment = await self._editable_assessment(school_id, assessment_id)
         await self._check_enter_scope(assessment, actor, scope)
         applied, row_errors = await self._apply_rows(
-            school_id, assessment, rows, actor=actor, source=source, reason=reason
+            school_id,
+            assessment,
+            list(enumerate(rows, start=1)),
+            actor=actor,
+            source=source,
+            reason=reason,
         )
         if row_errors:
             raise ProblemError(
@@ -369,18 +374,18 @@ class AssessmentService:
         row number in the returned result. A CSV whose header lacks the
         required columns, or a non-editable assessment, fails the whole job."""
         assessment = await self._editable_assessment(school_id, assessment_id)
-        rows, row_errors = _parse_score_csv(csv_text)
+        numbered_rows, row_errors = _parse_score_csv(csv_text)
         applied, apply_errors = await self._apply_rows(
             school_id,
             assessment,
-            rows,
+            numbered_rows,
             actor=actor,
             source="import",
             reason="bulk import",
         )
         return {
             "applied": len(applied),
-            "submitted": len(rows) + len(row_errors),
+            "submitted": len(numbered_rows) + len(row_errors),
             "errors": row_errors + apply_errors,
         }
 
@@ -388,7 +393,7 @@ class AssessmentService:
         self,
         school_id: UUID,
         assessment: Assessment,
-        rows: list[schemas.ScoreRowInput],
+        numbered_rows: list[tuple[int, schemas.ScoreRowInput]],
         *,
         actor: Actor,
         source: str,
@@ -397,6 +402,10 @@ class AssessmentService:
         """Shared apply path for the web batch and the import job: validates
         against the pinned template version and the sheet roster, enforces
         per-cell optimistic concurrency, writes ledger + outbox per change.
+
+        `numbered_rows` pairs each row with its caller-facing label (the web
+        path numbers list positions; the import numbers CSV data rows) so the
+        row_errors report points at the right line either way.
 
         Returns (applied scores, row errors). Rows that fail validation or
         conflict are skipped with an error entry — never applied half-way;
@@ -424,9 +433,9 @@ class AssessmentService:
         }
 
         row_errors: list[dict] = []
-        valid: list[schemas.ScoreRowInput] = []
+        valid: list[tuple[int, schemas.ScoreRowInput]] = []
         seen: set[tuple[UUID, str]] = set()
-        for row_no, row in enumerate(rows, start=1):
+        for row_no, row in numbered_rows:
             detail = self._row_problem(row, components, roster_ids, seen)
             if detail is None:
                 seen.add((row.subject_enrolment_id, row.component_key))
@@ -647,9 +656,10 @@ class AssessmentService:
         return job
 
 
-def _parse_score_csv(csv_text: str) -> tuple[list[schemas.ScoreRowInput], list[dict]]:
-    """CSV → ScoreRowInput list plus per-row parse errors (1-based data row
-    numbers; the header is line 1). Parse failures never abort the file."""
+def _parse_score_csv(csv_text: str) -> tuple[list[tuple[int, schemas.ScoreRowInput]], list[dict]]:
+    """CSV → (data-row-numbered rows, parse errors). Row numbers are 1-based
+    DATA row numbers (the header is not numbered) — the same numbering the
+    error report uses downstream. Parse failures never abort the file."""
     reader = csv.DictReader(io.StringIO(csv_text))
     fieldnames = set(reader.fieldnames or ())
     missing = [c for c in CSV_REQUIRED_COLUMNS if c not in fieldnames]
@@ -658,9 +668,9 @@ def _parse_score_csv(csv_text: str) -> tuple[list[schemas.ScoreRowInput], list[d
             VALIDATION_ERROR,
             f"CSV header must include {sorted(CSV_REQUIRED_COLUMNS)}; missing {missing}",
         )
-    rows: list[schemas.ScoreRowInput] = []
+    rows: list[tuple[int, schemas.ScoreRowInput]] = []
     errors: list[dict] = []
-    for i, raw in enumerate(reader, start=2):
+    for i, raw in enumerate(reader, start=1):
         try:
             se_id = UUID((raw.get("subject_enrolment_id") or "").strip())
             key = (raw.get("component_key") or "").strip()
@@ -672,12 +682,15 @@ def _parse_score_csv(csv_text: str) -> tuple[list[schemas.ScoreRowInput], list[d
             base_version_raw = (raw.get("base_version") or "").strip()
             base_version = int(base_version_raw) if base_version_raw else None
             rows.append(
-                schemas.ScoreRowInput(
-                    subject_enrolment_id=se_id,
-                    component_key=key,
-                    status=status,  # type: ignore[arg-type]
-                    value=value,
-                    base_version=base_version,
+                (
+                    i,
+                    schemas.ScoreRowInput(
+                        subject_enrolment_id=se_id,
+                        component_key=key,
+                        status=status,  # type: ignore[arg-type]
+                        value=value,
+                        base_version=base_version,
+                    ),
                 )
             )
         except (ValueError, InvalidOperation) as exc:
