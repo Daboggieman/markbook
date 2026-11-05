@@ -12,9 +12,9 @@ from collections.abc import Callable
 from typing import Any
 
 from arq.connections import RedisSettings
-from urllib.parse import urlparse
 
 from app.platform.config import get_settings
+from app.platform.job_queue import redis_settings_from_url
 from app.platform.logging import configure_logging, get_logger
 
 

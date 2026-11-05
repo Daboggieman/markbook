@@ -27,13 +27,13 @@ import csv
 import io
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.academic.models import Class, Subject, Term
+from app.academic.models import Class, Subject, Term, TeacherAssignment
 from app.access.service import Actor
 from app.assessment import schemas
 from app.assessment.models import (
@@ -119,10 +119,9 @@ class AssessmentService:
         """Editing a template creates a NEW version (spec §6.4) — existing
         versions are never rewritten, and existing assessments keep the
         version they were created with."""
-        await self.get_template(school_id, template_id)
+        template = await self.get_template(school_id, template_id)
         existing = await self._repo.list_versions(school_id, template_id)
         version_no = (existing[-1].version_no if existing else 0) + 1
-        template = await self.get_template(school_id, template_id)
         template.version += 1
         try:
             return await self._repo.create_version(
@@ -294,8 +293,6 @@ class AssessmentService:
             raise ProblemError(
                 PERMISSION_DENIED, "scores.enter requires school or assigned scope"
             )
-
-        from app.academic.models import TeacherAssignment
 
         term = await self._one_or_404(
             Term, school_id=assessment.school_id, id_=assessment.term_id, label="Term"
@@ -549,7 +546,10 @@ class AssessmentService:
         """Per-row validation; None when the row may proceed."""
         cell = (row.subject_enrolment_id, row.component_key)
         if cell in seen:
-            return f"Duplicate rows for enrolment {row.subject_enrolment_id}, component {row.component_key}"
+            return (
+                f"Duplicate rows for enrolment {row.subject_enrolment_id}, "
+                f"component {row.component_key}"
+            )
         if row.component_key not in components:
             return (
                 f"Unknown component {row.component_key!r} — template defines "

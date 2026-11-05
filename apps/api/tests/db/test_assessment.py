@@ -202,7 +202,7 @@ class TestUniqueness:
                         "t": ids["term"],
                         "c": ids["class"],
                         "sub": ids["subject"],
-                        "v": uuid4(),
+                        "v": ids["version"],
                     },
                 )
                 await s.commit()
@@ -224,7 +224,7 @@ class TestUniqueness:
                         "c": ids["class"],
                         "sec": section,
                         "sub": ids["subject"],
-                        "v": uuid4(),
+                        "v": ids["version"],
                     },
                 )
                 await s.commit()

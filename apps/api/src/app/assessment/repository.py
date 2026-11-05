@@ -17,7 +17,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.academic.models import ClassSubject, Enrolment, SubjectEnrolment
+from app.academic.models import ClassSubject, Enrolment, SubjectEnrolment, Term, TeacherAssignment
 from app.assessment.models import (
     Assessment,
     AssessmentTemplate,
@@ -162,8 +162,6 @@ class AssessmentRepository:
         one of the teacher's assignments — a NULL assignment section/subject
         means "any section/subject", mirroring people.repository's filter.
         """
-        from app.academic.models import Term, TeacherAssignment
-
         stmt = select(Assessment).where(Assessment.school_id == school_id)
         if term_id is not None:
             stmt = stmt.where(Assessment.term_id == term_id)

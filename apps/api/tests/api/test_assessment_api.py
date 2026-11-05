@@ -11,6 +11,7 @@ session-scoped testcontainer.
 
 # ruff: noqa: S608  — fixed literal SQL seeding against the testcontainer owner.
 
+import json
 from dataclasses import dataclass, field
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -158,7 +159,7 @@ async def _seed_world(maker: async_sessionmaker) -> World:
                 "INSERT INTO assessment_template_versions "
                 "(id, school_id, template_id, version_no, status, definition) "
                 "VALUES (:id, :s, :t, 1, 'active', :def)",
-                {"id": version, "s": school, "t": template, "def": str(DEFINITION)},
+                {"id": version, "s": school, "t": template, "def": json.dumps(DEFINITION)},
             ),
             (
                 "INSERT INTO assessments (id, school_id, term_id, class_id, section_id, "
