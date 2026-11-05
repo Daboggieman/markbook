@@ -549,11 +549,10 @@ class TestTeacherScope:
 
 
 def _teacher_user_id(world: World) -> UUID:
-    """The teacher user's id, recovered from their token (admin's token differs)."""
-    claims = world.teacher_token  # not decodable here without the key helper
+    """The teacher user's id, recovered from their token claims."""
     from app.identity.tokens import decode_access_token
 
-    return UUID(decode_access_token(claims)["sub"])
+    return UUID(decode_access_token(world.teacher_token)["sub"])
 
 
 class TestBulkImport:
