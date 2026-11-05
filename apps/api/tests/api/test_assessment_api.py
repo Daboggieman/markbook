@@ -165,7 +165,14 @@ async def _seed_world(maker: async_sessionmaker) -> World:
                 "INSERT INTO assessments (id, school_id, term_id, class_id, section_id, "
                 "subject_id, template_version_id) "
                 "VALUES (:id, :s, :t, :c, NULL, :sub, :v)",
-                {"id": assessment, "s": school, "t": term, "c": klass, "sub": subject, "v": version},
+                {
+                    "id": assessment,
+                    "s": school,
+                    "t": term,
+                    "c": klass,
+                    "sub": subject,
+                    "v": version,
+                },
             ),
             *[
                 (
