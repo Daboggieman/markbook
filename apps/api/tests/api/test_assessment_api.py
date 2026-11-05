@@ -416,7 +416,11 @@ class TestScoreEntry:
 
         stale = await world.client.put(
             f"/api/v1/assessments/{world.assessment_id}/scores",
-            json={"rows": [_cell(world.se_ids[0], "Exam", "entered", "45.00", base_version=version)]},
+            json={
+                "rows": [
+                    _cell(world.se_ids[0], "Exam", "entered", "45.00", base_version=version)
+                ]
+            },
             headers=world.auth(world.admin_token),
         )
         assert stale.status_code == 200
@@ -424,7 +428,11 @@ class TestScoreEntry:
 
         replay = await world.client.put(
             f"/api/v1/assessments/{world.assessment_id}/scores",
-            json={"rows": [_cell(world.se_ids[0], "Exam", "entered", "50.00", base_version=version)]},
+            json={
+                "rows": [
+                    _cell(world.se_ids[0], "Exam", "entered", "50.00", base_version=version)
+                ]
+            },
             headers=world.auth(world.admin_token),
         )
         assert replay.status_code == 409

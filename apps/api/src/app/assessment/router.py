@@ -37,7 +37,11 @@ async def list_templates(
     return [schemas.AssessmentTemplateResponse.model_validate(r) for r in rows]
 
 
-@router.post("/assessment-templates", response_model=schemas.AssessmentTemplateResponse, status_code=201)
+@router.post(
+    "/assessment-templates",
+    response_model=schemas.AssessmentTemplateResponse,
+    status_code=201,
+)
 async def create_template(
     body: schemas.AssessmentTemplateCreate,
     actor: Actor = Depends(require("assessments.manage")),

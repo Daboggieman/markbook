@@ -200,7 +200,12 @@ class AssessmentRepository:
         return result.scalar_one_or_none()
 
     async def get_score_for_cell(
-        self, school_id: UUID, *, assessment_id: UUID, subject_enrolment_id: UUID, component_key: str
+        self,
+        school_id: UUID,
+        *,
+        assessment_id: UUID,
+        subject_enrolment_id: UUID,
+        component_key: str,
     ) -> Score | None:
         result = await self._s.execute(
             select(Score).where(
