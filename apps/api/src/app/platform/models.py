@@ -19,7 +19,7 @@ class Base(DeclarativeBase):
     """All models inherit from this. Maps to Alembic's `imported_metadata`."""
 
     type_annotation_map = {
-        UUID: PgPgUUID(as_uuid=True),
+        UUID: PgUUID(as_uuid=True),
     }
 
 

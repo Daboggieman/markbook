@@ -47,20 +47,22 @@ async def import_scores(ctx: dict, *, job_id: str) -> None:
                 if job.status in ("succeeded", "failed"):
                     log.info("import_job_already_settled", job_id=job_id, status=job.status)
                     return
-                if job.school_id is not None:
-                    await set_tenant_context(session, str(job.school_id))
+                if job.school_id is None:
+                    raise ValueError("import job has no school_id — cannot run outside a tenant")
+                school_id = job.school_id
+                await set_tenant_context(session, str(school_id))
                 job.status = "running"
                 await session.flush()
 
                 actor = Actor(
                     user_id=job.created_by or uuid4(),
-                    school_id=job.school_id,
+                    school_id=school_id,
                     token_version=0,
                     session_id=uuid4(),
                 )
                 params = job.params or {}
                 result = await AssessmentService(session).apply_import(
-                    job.school_id,
+                    school_id,
                     UUID(str(params["assessment_id"])),
                     str(params.get("csv") or ""),
                     actor,
