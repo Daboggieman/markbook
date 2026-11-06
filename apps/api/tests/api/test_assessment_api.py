@@ -13,7 +13,6 @@ session-scoped testcontainer.
 
 import json
 from dataclasses import dataclass, field
-from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
@@ -360,9 +359,7 @@ class TestAssessments:
     async def test_list_respects_assigned_scope(self, world) -> None:
         """Assigned-scope teacher sees only assessments their assignments
         cover; before any assignment exists, that is none."""
-        r = await world.client.get(
-            "/api/v1/assessments", headers=world.auth(world.teacher_token)
-        )
+        r = await world.client.get("/api/v1/assessments", headers=world.auth(world.teacher_token))
         assert r.status_code == 200
         assert r.json() == []
 
@@ -417,9 +414,7 @@ class TestScoreEntry:
         stale = await world.client.put(
             f"/api/v1/assessments/{world.assessment_id}/scores",
             json={
-                "rows": [
-                    _cell(world.se_ids[0], "Exam", "entered", "45.00", base_version=version)
-                ]
+                "rows": [_cell(world.se_ids[0], "Exam", "entered", "45.00", base_version=version)]
             },
             headers=world.auth(world.admin_token),
         )
@@ -429,9 +424,7 @@ class TestScoreEntry:
         replay = await world.client.put(
             f"/api/v1/assessments/{world.assessment_id}/scores",
             json={
-                "rows": [
-                    _cell(world.se_ids[0], "Exam", "entered", "50.00", base_version=version)
-                ]
+                "rows": [_cell(world.se_ids[0], "Exam", "entered", "50.00", base_version=version)]
             },
             headers=world.auth(world.admin_token),
         )
@@ -620,9 +613,7 @@ class TestBulkImport:
         assert history.json()[0]["source"] == "import"
         assert history.json()[0]["reason"] == "bulk import"
 
-    async def test_import_of_score_that_already_exists_reports_not_overwrites(
-        self, world
-    ) -> None:
+    async def test_import_of_score_that_already_exists_reports_not_overwrites(self, world) -> None:
         """A re-import without base_version must NOT silently overwrite
         entered scores — the row is reported instead."""
         await world.client.put(
@@ -631,8 +622,7 @@ class TestBulkImport:
             headers=world.auth(world.admin_token),
         )
         csv_text = (
-            "subject_enrolment_id,component_key,status,value\n"
-            f"{world.se_ids[0]},CA1,entered,9.99\n"
+            f"subject_enrolment_id,component_key,status,value\n{world.se_ids[0]},CA1,entered,9.99\n"
         )
         r = await world.client.post(
             f"/api/v1/assessments/{world.assessment_id}/scores/import",
@@ -663,7 +653,5 @@ class TestBulkImport:
 
 class TestJobRoute:
     async def test_unknown_job_404(self, world) -> None:
-        r = await world.client.get(
-            f"/api/v1/jobs/{uuid4()}", headers=world.auth(world.admin_token)
-        )
+        r = await world.client.get(f"/api/v1/jobs/{uuid4()}", headers=world.auth(world.admin_token))
         assert r.status_code == 404

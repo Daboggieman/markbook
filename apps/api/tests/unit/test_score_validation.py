@@ -82,7 +82,16 @@ class TestNonEnteredRows:
 
 class TestUnknownStatus:
     def test_unknown_status_rejected(self) -> None:
-        """Guard for non-Pydantic callers (the bulk-import path parses CSV)."""
+        """Guard for callers that bypass the schema. ScoreRowInput's Literal
+        rejects an unknown status at parse time (so the API and the CSV
+        parser never reach this rule); model_construct skips validation,
+        simulating a future non-Pydantic row source."""
+        raw = ScoreRowInput.model_construct(
+            subject_enrolment_id=uuid4(),
+            component_key="CA1",
+            status="exused",
+            value=None,
+        )
         with pytest.raises(ProblemError) as exc:
-            validate_score_row(_row("exused", None), CA1)
+            validate_score_row(raw, CA1)
         assert exc.value.code == VALIDATION_ERROR

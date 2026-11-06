@@ -36,8 +36,7 @@ def validate_score_row(row: ScoreRowInput, component: ComponentDef) -> None:
         if row.value < 0 or row.value > component.max_score:
             raise ProblemError(
                 VALIDATION_ERROR,
-                f"Component {component.key}: value {row.value} is outside "
-                f"0..{component.max_score}",
+                f"Component {component.key}: value {row.value} is outside 0..{component.max_score}",
             )
     elif row.value is not None:
         raise ProblemError(

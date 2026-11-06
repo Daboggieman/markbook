@@ -33,7 +33,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.academic.models import Class, Subject, Term, TeacherAssignment
+from app.academic.models import Class, Subject, TeacherAssignment, Term
 from app.access.service import Actor
 from app.assessment import schemas
 from app.assessment.models import (
@@ -80,9 +80,7 @@ class AssessmentService:
         self, school_id: UUID, data: schemas.AssessmentTemplateCreate, actor: Actor
     ) -> tuple[AssessmentTemplate, AssessmentTemplateVersion]:
         """Create the template and its first (draft) version in one transaction."""
-        template = AssessmentTemplate(
-            school_id=school_id, name=data.name, created_by=actor.user_id
-        )
+        template = AssessmentTemplate(school_id=school_id, name=data.name, created_by=actor.user_id)
         try:
             template = await self._repo.create_template(template)
         except IntegrityError as exc:
@@ -290,9 +288,7 @@ class AssessmentService:
         if scope == "school":
             return
         if scope != "assigned":
-            raise ProblemError(
-                PERMISSION_DENIED, "scores.enter requires school or assigned scope"
-            )
+            raise ProblemError(PERMISSION_DENIED, "scores.enter requires school or assigned scope")
 
         term = await self._one_or_404(
             Term, school_id=assessment.school_id, id_=assessment.term_id, label="Term"
@@ -479,9 +475,7 @@ class AssessmentService:
                 try:
                     score = await self._repo.add_score(score)
                 except IntegrityError as exc:
-                    raise ProblemError(
-                        CONFLICT, "Score references inconsistent records"
-                    ) from exc
+                    raise ProblemError(CONFLICT, "Score references inconsistent records") from exc
                 await self._record_change(
                     school_id,
                     score,
@@ -561,8 +555,7 @@ class AssessmentService:
             )
         if row.component_key not in components:
             return (
-                f"Unknown component {row.component_key!r} — template defines "
-                f"{sorted(components)}"
+                f"Unknown component {row.component_key!r} — template defines {sorted(components)}"
             )
         if row.subject_enrolment_id not in roster_ids:
             return (

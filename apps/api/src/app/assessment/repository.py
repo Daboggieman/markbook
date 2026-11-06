@@ -17,7 +17,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.academic.models import ClassSubject, Enrolment, SubjectEnrolment, Term, TeacherAssignment
+from app.academic.models import ClassSubject, Enrolment, SubjectEnrolment, TeacherAssignment, Term
 from app.assessment.models import (
     Assessment,
     AssessmentTemplate,
@@ -56,9 +56,7 @@ class AssessmentRepository:
         )
         return list(result.scalars().all())
 
-    async def create_version(
-        self, version: AssessmentTemplateVersion
-    ) -> AssessmentTemplateVersion:
+    async def create_version(self, version: AssessmentTemplateVersion) -> AssessmentTemplateVersion:
         """Flush may raise IntegrityError on the (school, template, version_no)
         UNIQUE — the service maps it to CONFLICT."""
         self._s.add(version)
@@ -101,9 +99,7 @@ class AssessmentRepository:
         )
         return result.scalar_one_or_none()
 
-    async def set_version_status(
-        self, version: AssessmentTemplateVersion, status: str
-    ) -> None:
+    async def set_version_status(self, version: AssessmentTemplateVersion, status: str) -> None:
         version.status = status
         await self._s.flush()
 
@@ -191,9 +187,7 @@ class AssessmentRepository:
 
     # ---- scores & ledger ---------------------------------------------------------
 
-    async def get_score(
-        self, school_id: UUID, score_id: UUID
-    ) -> Score | None:
+    async def get_score(self, school_id: UUID, score_id: UUID) -> Score | None:
         result = await self._s.execute(
             select(Score).where(Score.school_id == school_id, Score.id == score_id)
         )
