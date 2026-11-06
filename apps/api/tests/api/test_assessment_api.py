@@ -77,8 +77,8 @@ async def _seed_world(maker: async_sessionmaker) -> World:
                     {
                         "id": user,
                         "s": school,
-                        "email": f"{UUID(user).hex[:8]}@phase3.local",
-                        "username": f"u{UUID(user).hex[:8]}",
+                        "email": f"{user.hex[:8]}@phase3.local",
+                        "username": f"u{user.hex[:8]}",
                     },
                 )
                 for user in (admin, teacher)

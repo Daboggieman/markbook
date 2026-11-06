@@ -72,14 +72,17 @@ async def _seed_assessment_chain(url: str, school_id, tag: str) -> None:
                 {"s": school, "tag": tag},
             ),
             (
+                # Level/class names carry the tag: the two_schools fixture's
+                # fixed schools may already hold Phase 2's untagged 'JSS' rows,
+                # and (school_id, name) is UNIQUE on both tables.
                 "INSERT INTO educational_levels (id, school_id, name, ordinal) "
-                "VALUES (:id, :s, 'JSS', 2)",
-                {"id": level, "s": school},
+                "VALUES (:id, :s, 'JSS ' || :tag, 2)",
+                {"id": level, "s": school, "tag": tag},
             ),
             (
                 "INSERT INTO classes (id, school_id, level_id, name, ordinal) "
-                "VALUES (:id, :s, :l, 'JSS 1', 1)",
-                {"id": klass, "s": school, "l": level},
+                "VALUES (:id, :s, :l, 'JSS 1 ' || :tag, 1)",
+                {"id": klass, "s": school, "l": level, "tag": tag},
             ),
             (
                 "INSERT INTO subjects (id, school_id, name) VALUES (:id, :s, 'Maths ' || :tag)",
@@ -134,8 +137,8 @@ async def _seed_assessment_chain(url: str, school_id, tag: str) -> None:
             ),
             (
                 "INSERT INTO students (id, school_id, first_name, last_name, admission_no, "
-                "status) VALUES (:id, :s, 'Ada', :tag, 'ADM-' || :tag, 'active')",
-                {"id": student, "s": school, "tag": tag},
+                "status) VALUES (:id, :s, 'Ada', :ln, 'ADM-' || :adm, 'active')",
+                {"id": student, "s": school, "ln": tag, "adm": tag},
             ),
             (
                 "INSERT INTO enrolments (id, school_id, student_id, session_id, class_id, "
@@ -176,8 +179,10 @@ async def test_phase3_rls_blocks_cross_tenant_reads(
     two_schools, migrated_url, app_role_session_factory
 ) -> None:
     school_a, school_b = two_schools
-    await _seed_assessment_chain(migrated_url, school_a, "AAA")
-    await _seed_assessment_chain(migrated_url, school_b, "BBB")
+    # Tags are namespaced P3-* — the two_schools schools already hold Phase 2
+    # seeds tagged "AAA"/"BBB", and several seeded names are UNIQUE per school.
+    await _seed_assessment_chain(migrated_url, school_a, "P3-AAA")
+    await _seed_assessment_chain(migrated_url, school_b, "P3-BBB")
 
     async with app_role_session_factory() as session:
         async with session.begin():
@@ -196,7 +201,7 @@ async def test_phase3_rls_blocks_cross_tenant_reads(
 
 
 async def test_phase3_rls_blocks_unset_context(migrated_url, app_role_session_factory) -> None:
-    await _seed_assessment_chain(migrated_url, uuid4(), "UAA")
+    await _seed_assessment_chain(migrated_url, uuid4(), "P3-UAA")
 
     async with app_role_session_factory() as session:
         async with session.begin():

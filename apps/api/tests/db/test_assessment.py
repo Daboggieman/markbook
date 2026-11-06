@@ -127,6 +127,7 @@ async def ids(maker: async_sessionmaker) -> dict[str, UUID]:
         "assessment": assessment,
         "subject_enrolment": subject_enrolment,
         "template": template,
+        "version": version,
         "term": term,
         "class": klass,
         "subject": subject,
@@ -139,19 +140,21 @@ async def _insert_score(
     *,
     status: str,
     value: str | None,
+    key: str = "CA1",
 ) -> None:
     async with maker() as s:
         await s.execute(
             text(
                 "INSERT INTO scores (id, school_id, assessment_id, subject_enrolment_id, "
                 "component_key, status, value) "
-                "VALUES (:id, :s, :a, :se, 'CA1', :status, :value)"
+                "VALUES (:id, :s, :a, :se, :key, :status, :value)"
             ),
             {
                 "id": uuid4(),
                 "s": ids["school"],
                 "a": ids["assessment"],
                 "se": ids["subject_enrolment"],
+                "key": key,
                 "status": status,
                 "value": value,
             },
@@ -183,8 +186,10 @@ class TestCheckConstraint:
         await _insert_score(maker, ids, status="entered", value="0.00")
 
     async def test_non_entered_null_passes(self, maker, ids) -> None:
-        for status in ("absent", "exempt", "missing"):
-            await _insert_score(maker, ids, status=status, value=None)
+        # Distinct cells: three statuses on one (enrolment, component) would
+        # trip the cell UNIQUE before the CHECK is ever consulted.
+        for status, key in (("absent", "CA1"), ("exempt", "CA2"), ("missing", "CA3")):
+            await _insert_score(maker, ids, status=status, value=None, key=key)
 
 
 class TestUniqueness:
@@ -216,34 +221,45 @@ class TestUniqueness:
                 await s.commit()
 
     async def test_assessment_different_sections_both_allowed(self, maker, ids) -> None:
-        """NULL section vs an explicit section are distinct rows."""
-        for section in (uuid4(), None):
-            async with maker() as s:
-                await s.execute(
-                    text(
-                        "INSERT INTO assessments (id, school_id, term_id, class_id, "
-                        "section_id, subject_id, template_version_id) "
-                        "VALUES (:id, :s, :t, :c, :sec, :sub, :v)"
-                    ),
-                    {
-                        "id": uuid4(),
-                        "s": ids["school"],
-                        "t": ids["term"],
-                        "c": ids["class"],
-                        "sec": section,
-                        "sub": ids["subject"],
-                        "v": ids["version"],
-                    },
-                )
-                await s.commit()
+        """NULL section vs an explicit section are distinct rows: the fixture
+        already created the section-less assessment; a sectioned one for the
+        same (school, term, class, subject) coexists with it."""
+        section = uuid4()
+        async with maker() as s:
+            await s.execute(
+                text(
+                    "INSERT INTO sections (id, school_id, class_id, name) "
+                    "VALUES (:id, :s, :c, 'A')"
+                ),
+                {"id": section, "s": ids["school"], "c": ids["class"]},
+            )
+            await s.execute(
+                text(
+                    "INSERT INTO assessments (id, school_id, term_id, class_id, "
+                    "section_id, subject_id, template_version_id) "
+                    "VALUES (:id, :s, :t, :c, :sec, :sub, :v)"
+                ),
+                {
+                    "id": uuid4(),
+                    "s": ids["school"],
+                    "t": ids["term"],
+                    "c": ids["class"],
+                    "sec": section,
+                    "sub": ids["subject"],
+                    "v": ids["version"],
+                },
+            )
+            await s.commit()
 
     async def test_template_version_no_unique(self, maker, ids) -> None:
+        # The fixture already owns version_no 1 ('active'); this test's pair
+        # is version_no 2 — inserted twice, colliding the second time.
         async with maker() as s:
             await s.execute(
                 text(
                     "INSERT INTO assessment_template_versions "
                     "(id, school_id, template_id, version_no, status, definition) "
-                    "VALUES (:id, :s, :t, 1, 'draft', :def)"
+                    "VALUES (:id, :s, :t, 2, 'draft', :def)"
                 ),
                 {
                     "id": uuid4(),
@@ -259,7 +275,7 @@ class TestUniqueness:
                     text(
                         "INSERT INTO assessment_template_versions "
                         "(id, school_id, template_id, version_no, status, definition) "
-                        "VALUES (:id, :s, :t, 1, 'draft', :def)"
+                        "VALUES (:id, :s, :t, 2, 'draft', :def)"
                     ),
                     {
                         "id": uuid4(),
