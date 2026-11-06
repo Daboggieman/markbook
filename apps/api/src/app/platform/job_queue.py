@@ -26,7 +26,7 @@ def redis_settings_from_url(url: str) -> RedisSettings:
     return RedisSettings(
         host=parsed.hostname or "localhost",
         port=parsed.port or 6379,
-        db=int(parsed.path.lstrip("/") or 0),
+        database=int(parsed.path.lstrip("/") or 0),
         password=parsed.password,
     )
 
