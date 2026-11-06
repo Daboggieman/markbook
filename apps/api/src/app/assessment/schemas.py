@@ -161,7 +161,7 @@ class SheetRow(BaseModel):
     subject_enrolment_id: UUID
     student_id: UUID
     student_name: str
-    admission_no: str
+    admission_no: str | None  # nullable in the students table
     scores: dict[str, ScoreCell] = {}
 
 

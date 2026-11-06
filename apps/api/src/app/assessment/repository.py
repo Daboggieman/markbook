@@ -247,10 +247,11 @@ class AssessmentRepository:
         class_id: UUID,
         section_id: UUID | None,
         subject_id: UUID,
-    ) -> list[tuple[UUID, UUID, str, str, str]]:
+    ) -> list[tuple[UUID, UUID, str, str, str | None]]:
         """The roster the score sheet is drawn from: one row per live
         subject enrolment, (subject_enrolment_id, student_id, first_name,
-        last_name, admission_no), name-ordered.
+        last_name, admission_no), name-ordered. admission_no is nullable in
+        the students table, so it comes back as str | None.
 
         An assessment without a section covers every live enrolment in the
         class; a sectioned one covers only that section's enrolments.
