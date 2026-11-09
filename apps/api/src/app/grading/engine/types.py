@@ -116,8 +116,11 @@ class ComputedResult:
 
     @property
     def blocked(self) -> bool:
-        """missing_policy=block fired — the student cannot be processed."""
-        return self.total is None and "incomplete" not in self.flags
+        """This student has no computable total: missing_policy=block fired
+        (flags={'incomplete'}) or every component was excluded
+        (flags={'no_scoreable_components'}). The service fails a run on the
+        former and stores the latter with NULL total/grade/position."""
+        return self.total is None
 
 
 @dataclass(frozen=True)
