@@ -97,7 +97,14 @@ async def ids(maker: async_sessionmaker) -> dict[str, UUID]:
                 "INSERT INTO assessments (id, school_id, term_id, class_id, section_id, "
                 "subject_id, template_version_id) "
                 "VALUES (:id, :s, :t, :c, NULL, :sub, :v)",
-                {"id": assessment, "s": school, "t": term, "c": klass, "sub": subject, "v": version},
+                {
+                    "id": assessment,
+                    "s": school,
+                    "t": term,
+                    "c": klass,
+                    "sub": subject,
+                    "v": version,
+                },
             ),
             (
                 "INSERT INTO students (id, school_id, first_name, last_name, admission_no, "
@@ -203,7 +210,12 @@ class TestRunAndResults:
                         "subject_enrolment_id, total, grade, position, breakdown, flags) "
                         "VALUES (:id, :s, :r, :se, 70.00, 'A', 2, '[]'::jsonb, '[]'::jsonb)"
                     ),
-                    {"id": uuid4(), "s": ids["school"], "r": ids["run"], "se": ids["subject_enrolment"]},
+                    {
+                        "id": uuid4(),
+                        "s": ids["school"],
+                        "r": ids["run"],
+                        "se": ids["subject_enrolment"],
+                    },
                 )
                 await s.commit()
 
