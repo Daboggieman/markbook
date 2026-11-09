@@ -6,16 +6,17 @@ Chidi 49.5→50 C (round once at the end), Dara absent→0 → 79 A, Efe exempt 
 100 exercise every band edge of the golden scheme.
 """
 
+from dataclasses import replace
 from decimal import Decimal
 
 import pytest
 
 from app.grading.engine import (
+    Boundary,
+    ComputedResult,
     EngineComponent,
     EngineScheme,
     EngineTemplate,
-    Boundary,
-    ComputedResult,
     ScoreInput,
     build_scheme,
     compute,
@@ -54,21 +55,32 @@ GOLDEN_SCHEME = EngineScheme(
     tie_policy="dense",
 )
 
+COMPONENT_KEYS = ("CA1", "CA2", "Test", "Exam")
+
 
 def entered(seid: str, **cells: str) -> list[ScoreInput]:
     """One entered ScoreInput per given component, plus the rest missing —
     the full per-student consumption set (one entry per template component)."""
-    out = [
-        ScoreInput(seid, key, "entered", Decimal(value)) for key, value in sorted(cells.items())
-    ]
+    out = [ScoreInput(seid, key, "entered", Decimal(value)) for key, value in sorted(cells.items())]
     present = {s.component_key for s in out}
-    out += [ScoreInput(seid, key, "missing", None) for key in ("CA1", "CA2", "Test", "Exam")
-            if key not in present]
+    out += [ScoreInput(seid, key, "missing", None) for key in COMPONENT_KEYS if key not in present]
     return out
 
 
 def total_of(values: dict[str, str]) -> ComputedResult:
     return compute(entered("se1", **values), GOLDEN_TEMPLATE, GOLDEN_SCHEME)
+
+
+def result_with_total(seid: str, total: str) -> ComputedResult:
+    """A computed result with exactly `total` under the golden template:
+    CA1 10 + CA2 10 + Test 20 + Exam (total - 40); valid for totals 40..100."""
+    exam = Decimal(total) - 40
+    assert Decimal("0") <= exam <= 60
+    return compute(
+        entered(seid, CA1="10", CA2="10", Test="20", Exam=str(exam)),
+        GOLDEN_TEMPLATE,
+        GOLDEN_SCHEME,
+    )
 
 
 class TestGoldenExample:
@@ -137,25 +149,26 @@ class TestBoundaryEdges:
     """Edge values 39, 40, 44, 45, 69, 70, 100 — every band edge."""
 
     @pytest.mark.parametrize(
-        ("exam", "expected_grade"),
+        ("test", "exam", "expected_total", "expected_grade"),
         [
-            ("0", "F"),  # 39 total
-            ("1", "E"),  # 40
-            ("4", "E"),  # 44 — top of E
-            ("5", "D"),  # 45 — bottom of D
-            ("29", "B"),  # 69 — top of B
-            ("30", "A"),  # 70 — bottom of A
-            ("60", "A"),  # 100
+            # CA1 10 + CA2 10 + Test 19 = 39, plus the exam.
+            ("19", "0", "39", "F"),
+            ("19", "1", "40", "E"),
+            ("19", "5", "44", "E"),
+            ("19", "6", "45", "D"),
+            ("19", "30", "69", "B"),
+            ("19", "31", "70", "A"),
+            ("20", "60", "100", "A"),
         ],
     )
-    def test_edges(self, exam: str, expected_grade: str):
-        result = total_of({"CA1": "10", "CA2": "10", "Test": "19", "Exam": exam})
-        assert result.total == Decimal(str(10 + 10 + 19 + int(exam)))
+    def test_edges(self, test: str, exam: str, expected_total: str, expected_grade: str):
+        result = total_of({"CA1": "10", "CA2": "10", "Test": test, "Exam": exam})
+        assert result.total == Decimal(expected_total)
         assert result.grade == expected_grade
 
     def test_zero_total_is_F(self):
         result = compute(
-            [ScoreInput("se1", k, "missing", None) for k in ("CA1", "CA2", "Test", "Exam")],
+            [ScoreInput("se1", k, "missing", None) for k in COMPONENT_KEYS],
             GOLDEN_TEMPLATE,
             GOLDEN_SCHEME,
         )
@@ -166,15 +179,19 @@ class TestBoundaryEdges:
 
 class TestPolicies:
     def test_missing_block_blocks_the_whole_student(self):
-        scheme = EngineScheme(**{**GOLDEN_SCHEME.__dict__, "missing_policy": "block"})
-        result = total_of({"CA1": "8", "Exam": "48"})  # CA2, Test missing
+        scheme = replace(GOLDEN_SCHEME, missing_policy="block")
+        result = compute(
+            entered("se1", CA1="8", Exam="48"),  # CA2, Test missing
+            GOLDEN_TEMPLATE,
+            scheme,
+        )
         assert result.blocked is True
         assert result.total is None
         assert result.grade is None
         assert "incomplete" in result.flags
 
     def test_missing_treat_zero(self):
-        scheme = EngineScheme(**{**GOLDEN_SCHEME.__dict__, "missing_policy": "treat_zero"})
+        scheme = replace(GOLDEN_SCHEME, missing_policy="treat_zero")
         result = compute(entered("se1", CA1="10"), GOLDEN_TEMPLATE, scheme)
         assert result.total == Decimal("10")
         assert result.flags == frozenset()
@@ -185,8 +202,7 @@ class TestPolicies:
         assert result.flags == frozenset({"incomplete"})
 
     def test_absent_exclude_and_renormalise(self):
-        scheme = EngineScheme(**{**GOLDEN_SCHEME.__dict__, "absent_policy":
-                                 "exclude_and_renormalise"})
+        scheme = replace(GOLDEN_SCHEME, absent_policy="exclude_and_renormalise")
         result = compute(
             [
                 ScoreInput("se1", "CA1", "entered", Decimal("7")),
@@ -217,7 +233,7 @@ class TestPolicies:
 
     def test_everything_excluded_has_no_total(self):
         result = compute(
-            [ScoreInput("se1", k, "exempt", None) for k in ("CA1", "CA2", "Test", "Exam")],
+            [ScoreInput("se1", k, "exempt", None) for k in COMPONENT_KEYS],
             GOLDEN_TEMPLATE,
             GOLDEN_SCHEME,
         )
@@ -227,8 +243,9 @@ class TestPolicies:
 
     def test_full_precision_before_rounding(self):
         # 1/3 * 30 = 9.999… — kept at full precision, rounds to 10 once at the end.
-        template = EngineTemplate(components=(EngineComponent("Quiz", Decimal("3"),
-                                                             Decimal("30")),))
+        template = EngineTemplate(
+            components=(EngineComponent("Quiz", Decimal("3"), Decimal("30")),)
+        )
         scheme = EngineScheme(
             rounding_mode="ROUND_HALF_UP",
             precision=0,
@@ -243,55 +260,40 @@ class TestPolicies:
 
 
 class TestRanking:
-    def results_with_totals(self, *totals: str) -> list[ComputedResult]:
-        out = []
-        for i, total in enumerate(totals):
-            seid = f"se{i}"
-            # entered value == total on the golden template (weight == max).
-            value = Decimal(total)
-            scores = [
-                ScoreInput(seid, "CA1", "entered", value if value <= 10 else Decimal("10")),
-            ]
-            rest = value - Decimal("10") if value > 10 else Decimal("0")
-            scores.append(ScoreInput(seid, "CA2", "entered", rest if rest <= 10
-                                     else Decimal("10")))
-            rest -= Decimal("10") if rest > 10 else Decimal("0")
-            scores.append(ScoreInput(seid, "Test", "entered", min(rest, Decimal("20"))))
-            rest -= min(rest, Decimal("20"))
-            scores.append(ScoreInput(seid, "Exam", "entered", max(rest, Decimal("0"))))
-            out.append(compute(scores, GOLDEN_TEMPLATE, GOLDEN_SCHEME))
-        return out
-
     def test_dense_ranking(self):
-        results = self.results_with_totals("78", "63", "63", "50")
-        ranked = rank(results, EngineScheme(**{**GOLDEN_SCHEME.__dict__, "tie_policy":
-                                               "dense"}))
+        results = [result_with_total(f"se{i}", t) for i, t in enumerate(("78", "63", "63", "50"))]
+        ranked = rank(results, replace(GOLDEN_SCHEME, tie_policy="dense"))
         assert [r.position for r in ranked] == [1, 2, 2, 3]
-        assert [r.total for r in ranked] == [Decimal("78"), Decimal("63"),
-                                             Decimal("63"), Decimal("50")]
+        assert [r.total for r in ranked] == [
+            Decimal("78"),
+            Decimal("63"),
+            Decimal("63"),
+            Decimal("50"),
+        ]
 
     def test_competition_ranking(self):
-        results = self.results_with_totals("78", "63", "63", "50")
-        ranked = rank(results, EngineScheme(**{**GOLDEN_SCHEME.__dict__, "tie_policy":
-                                               "competition"}))
+        results = [result_with_total(f"se{i}", t) for i, t in enumerate(("78", "63", "63", "50"))]
+        ranked = rank(results, replace(GOLDEN_SCHEME, tie_policy="competition"))
         assert [r.position for r in ranked] == [1, 2, 2, 4]
 
     def test_ties_share_position_id_ordered(self):
-        results = self.results_with_totals("63", "63")
+        results = [result_with_total("se0", "63"), result_with_total("se1", "63")]
         ranked = rank(results, GOLDEN_SCHEME)
         assert [r.position for r in ranked] == [1, 1]
         assert [r.subject_enrolment_id for r in ranked] == ["se0", "se1"]
 
     def test_blocked_results_are_not_ranked(self):
-        good = total_of({"CA1": "8", "CA2": "7", "Test": "15", "Exam": "48"})
-        scheme = EngineScheme(**{**GOLDEN_SCHEME.__dict__, "missing_policy": "block"})
+        good = result_with_total("se1", "78")
+        scheme = replace(GOLDEN_SCHEME, missing_policy="block")
         blocked = compute(entered("se9", CA1="8"), GOLDEN_TEMPLATE, scheme)
         ranked = rank([good, blocked], GOLDEN_SCHEME)
         assert len(ranked) == 1
         assert ranked[0].subject_enrolment_id == "se1"
 
     def test_rank_is_deterministic(self):
-        results = self.results_with_totals("78", "63", "50", "79", "73")
+        results = [
+            result_with_total(f"se{i}", t) for i, t in enumerate(("78", "63", "50", "79", "73"))
+        ]
         first = rank(results, GOLDEN_SCHEME)
         second = rank(list(reversed(results)), GOLDEN_SCHEME)
         assert first == second
@@ -317,7 +319,7 @@ class TestDeterminism:
         assert input_hash(base) == input_hash(base)
         changed = [ScoreInput("se1", "CA1", "entered", Decimal("9"))] + base[1:]
         assert input_hash(base) != input_hash(changed)
-        # synthesized missing entries count: a different component missing changes it
+        # synthesized missing entries count: dropping one changes the hash
         fewer = [s for s in base if s.component_key != "Exam"]
         assert input_hash(base) != input_hash(fewer)
 
@@ -330,28 +332,35 @@ class TestSchemeValidation:
             "missing_policy": "flag_incomplete",
             "absent_policy": "treat_zero",
             "exempt_policy": "exclude_and_renormalise",
-            "boundaries": [{"grade": "A", "min": 70, "max": 100},
-                           {"grade": "B", "min": 0, "max": 69}],
+            "boundaries": [
+                {"grade": "A", "min": 70, "max": 100},
+                {"grade": "B", "min": 0, "max": 69},
+            ],
             "tie_policy": "dense",
         }
         kwargs.update(overrides)
         return validate_scheme(**kwargs)  # type: ignore[arg-type]
 
     def test_valid_golden_boundaries(self):
-        assert self.build() == (
-            Boundary("B", 0, 69),
-            Boundary("A", 70, 100),
-        )
+        assert self.build() == (Boundary("B", 0, 69), Boundary("A", 70, 100))
 
     def test_gap_rejected(self):
         with pytest.raises(ValueError, match="contiguous"):
-            self.build(boundaries=[{"grade": "A", "min": 70, "max": 100},
-                                   {"grade": "B", "min": 0, "max": 68}])
+            self.build(
+                boundaries=[
+                    {"grade": "A", "min": 70, "max": 100},
+                    {"grade": "B", "min": 0, "max": 68},
+                ]
+            )
 
     def test_overlap_rejected(self):
         with pytest.raises(ValueError, match="contiguous"):
-            self.build(boundaries=[{"grade": "A", "min": 70, "max": 100},
-                                   {"grade": "B", "min": 0, "max": 70}])
+            self.build(
+                boundaries=[
+                    {"grade": "A", "min": 70, "max": 100},
+                    {"grade": "B", "min": 0, "max": 70},
+                ]
+            )
 
     def test_must_reach_zero_and_hundred(self):
         with pytest.raises(ValueError, match="start at 0"):
@@ -365,8 +374,12 @@ class TestSchemeValidation:
 
     def test_duplicate_grade_rejected(self):
         with pytest.raises(ValueError, match="Duplicate grade"):
-            self.build(boundaries=[{"grade": "A", "min": 0, "max": 50},
-                                   {"grade": "A", "min": 51, "max": 100}])
+            self.build(
+                boundaries=[
+                    {"grade": "A", "min": 0, "max": 50},
+                    {"grade": "A", "min": 51, "max": 100},
+                ]
+            )
 
     def test_unknown_policy_rejected(self):
         with pytest.raises(ValueError, match="missing_policy"):
@@ -391,20 +404,29 @@ class TestSchemeValidation:
             missing_policy="flag_incomplete",
             absent_policy="treat_zero",
             exempt_policy="exclude_and_renormalise",
-            boundaries=[{"grade": "A", "min": 70, "max": 100},
-                        {"grade": "B", "min": 0, "max": 69}],
+            boundaries=[{"grade": "A", "min": 70, "max": 100}, {"grade": "B", "min": 0, "max": 69}],
             tie_policy="dense",
         )
         assert scheme.boundaries == (Boundary("B", 0, 69), Boundary("A", 70, 100))
-        assert scheme == GOLDEN_SCHEME
+        # Same engine-relevant settings as the golden scheme (boundaries differ).
+        assert scheme.rounding_mode == GOLDEN_SCHEME.rounding_mode
+        assert scheme.precision == GOLDEN_SCHEME.precision
+        assert scheme.missing_policy == GOLDEN_SCHEME.missing_policy
+        assert scheme.absent_policy == GOLDEN_SCHEME.absent_policy
+        assert scheme.exempt_policy == GOLDEN_SCHEME.exempt_policy
+        assert scheme.tie_policy == GOLDEN_SCHEME.tie_policy
 
 
 class TestUngradedGap:
     def test_precision_leaves_gap_flagged(self):
-        # precision 1 keeps 44.5 unrounded at the band edge → no boundary holds
-        # it → grade None + 'ungraded' flag (integer boundaries are the norm).
-        scheme = EngineScheme(**{**GOLDEN_SCHEME.__dict__, "precision": 1})
-        result = total_of({"CA1": "10", "CA2": "10", "Test": "14", "Exam": "10.5"})
+        # precision 1 keeps 44.5 unrounded at the band edge → no boundary
+        # holds it → grade None + 'ungraded' flag (integer boundaries are norm).
+        scheme = replace(GOLDEN_SCHEME, precision=1)
+        result = compute(
+            entered("se1", CA1="10", CA2="10", Test="14", Exam="10.5"),
+            GOLDEN_TEMPLATE,
+            scheme,
+        )
         assert result.total == Decimal("44.5")
         assert result.grade is None
         assert "ungraded" in result.flags

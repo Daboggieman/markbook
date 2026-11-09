@@ -6,8 +6,8 @@ underlying sort is total DESC then subject_enrolment_id ASC so the output order
 is fully deterministic even between tied students.
 """
 
+from collections.abc import Sequence
 from decimal import Decimal, localcontext
-from typing import Sequence
 
 from app.grading.engine.compute import ENGINE_PRECISION
 from app.grading.engine.types import ComputedResult, EngineScheme, RankedResult

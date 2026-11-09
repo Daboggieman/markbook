@@ -11,8 +11,8 @@ Decimal('8.00') and Decimal('8') hash identically.
 
 import hashlib
 import json
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Sequence
 
 from app.grading.engine.types import ScoreInput
 

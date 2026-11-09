@@ -13,8 +13,8 @@ not 49.
 """
 
 import decimal
+from collections.abc import Sequence
 from decimal import Decimal, localcontext
-from typing import Sequence
 
 from app.grading.engine.scheme import find_grade
 from app.grading.engine.types import (
@@ -135,15 +135,14 @@ def compute(
                 breakdown=tuple(entries),
                 flags=frozenset(flags | {FLAG_INCOMPLETE}),
             )
-        if excluded:
-            flags.add(FLAG_RENORMALISED)
 
         # Step 4 — total; renormalise when components were excluded.
         raw_total = sum(contributions, Decimal(0))
         if excluded:
             if included_weight == 0:
                 # Everything excluded (e.g. exempt from every component):
-                # renormalising would divide by zero — flag, no total.
+                # renormalising would divide by zero — flag, no total. No
+                # 'renormalised' flag: no renormalisation ever happened.
                 return ComputedResult(
                     subject_enrolment_id=seid,
                     total=None,
@@ -151,6 +150,7 @@ def compute(
                     breakdown=tuple(entries),
                     flags=frozenset(flags | {FLAG_NO_SCOREABLE}),
                 )
+            flags.add(FLAG_RENORMALISED)
             raw_total = raw_total / included_weight * 100
 
         # Step 5 — round ONCE, at the end.

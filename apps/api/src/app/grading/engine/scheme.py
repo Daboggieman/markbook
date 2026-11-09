@@ -106,7 +106,7 @@ def validate_scheme(
         raise SchemeValidationError("Boundaries must start at 0")
     if parsed[-1][1].max != 100:
         raise SchemeValidationError("Boundaries must end at 100")
-    for (_, lower), (_, upper) in zip(parsed, parsed[1:]):
+    for (_, lower), (_, upper) in zip(parsed, parsed[1:], strict=False):
         if upper.min != lower.max + 1:
             raise SchemeValidationError(
                 f"Boundaries must be contiguous and non-overlapping: "
