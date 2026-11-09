@@ -14,7 +14,7 @@ calls each makes. Source of record for module purpose: spec §3 and
 | `access` | `roles`, `permissions`, `role_permissions`, `user_roles` | `platform`, `audit` |
 | `people` | `students`, `guardians`, `student_guardians` | `platform`, `audit` |
 | `academic` | `academic_sessions`, `terms`, `educational_levels`, `classes`, `sections`, `subjects`, `class_subjects`, `enrolments`, `subject_enrolments`, `teacher_assignments`, `promotion_records` | `platform`, `audit`, `people` (read) |
-| `assessment` | `assessment_templates`, `assessment_template_versions`, `assessments`, `scores`, `score_changes` | `platform`, `audit`, `academic` |
+| `assessment` | `assessment_templates`, `assessment_template_versions`, `assessments`, `scores`, `score_changes` | `platform`, `audit`, `academic` (models), `people` (models, read) |
 | `grading` | `grading_schemes`, `result_processing_runs`, `processed_results` | `platform`, `audit`, `assessment` |
 | `workflow` | `workflow_definitions`, `approval_records`, `published_documents` | `platform`, `audit`, `assessment`, `grading` |
 | `documents` | (storage only — PDFs live in S3) | `platform`, `audit`, `workflow` |
@@ -42,12 +42,23 @@ modules ship.*
 - `grant_role(user_id, role_id, granted_by)`
 - `revoke_role(user_id, role_id)`
 
-### assessment service
+### assessment service (Phase 3)
 
-- `create_assessment(...)` → `Assessment`
-- `batch_upsert_scores(assessment_id, score_rows, actor)` → list[`Score`]
-- `import_scores(assessment_id, file_bytes, actor)` → `Job`  # async
-- `get_score_history(score_id)` → list[`ScoreChange`]
+- `create_template(school_id, data, actor)` → (`AssessmentTemplate`, draft v1)
+- `create_template_version(school_id, template_id, data)` → `AssessmentTemplateVersion`  # editing creates a NEW version
+- `activate_template_version(school_id, version_id)` → `AssessmentTemplateVersion`  # retires the previous active
+- `create_assessment(school_id, data)` → `Assessment`  # requires an active template version
+- `list_assessments(school_id, *, scope, actor, ...)` → list[`Assessment`]  # assigned scope → teacher assignments filter
+- `get_sheet(school_id, assessment_id)` → `ScoreSheetResponse`  # roster + entered cells
+- `batch_upsert_scores(school_id, assessment_id, rows, actor, *, scope, source, reason)` → list[`Score`]  # all-or-nothing; per-cell `base_version`; stale → 409 (422 when validation also failed)
+- `apply_import(school_id, assessment_id, csv_text, actor)` → dict  # row-level partial success; runs in the worker job `assessment.jobs::import_scores`
+- `enqueue_import(school_id, assessment_id, csv_text, actor, *, scope)` → `Job`  # scope checked at enqueue time
+- `get_score_history(school_id, score_id)` → list[`ScoreChange`]
+- `get_job(school_id, job_id)` → `Job`
+
+Read edges: `assessment.repository` joins `academic.models` (Enrolment, ClassSubject,
+SubjectEnrolment, Term, TeacherAssignment) and `people.models` (Student) for the score-sheet
+roster — models only, never another module's repository (the Phase 2 precedent).
 
 ### grading service
 

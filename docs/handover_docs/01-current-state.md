@@ -1,4 +1,4 @@
-# Current state — 2026-11-02
+# Current state — 2026-11-06
 
 > **Working branch: `markbook_phase_3`** (cut from the `markbook_phase_2` tip `f1a5b97`,
 > 2026-11-02, at Phase 3 start). Phase 2 lives on `markbook_phase_2`; Phase 1 on
@@ -12,7 +12,7 @@
 | 0 — Foundations | ✅ **COMPLETE** | 2026-10-25 | All exit criteria verified live (compose, health, migrations, RLS); CI push pending |
 | 1 — Identity, access, audit | ✅ **COMPLETE** | 2026-10-27 | All exit criteria verified live: full suite 68 passed (incl. 10 testcontainer tests), ruff/mypy clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 2 — People and academic structure | ✅ **COMPLETE** | 2026-11-02 | All exit criteria verified live: full suite **83 passed** (incl. 25 testcontainer tests), ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
-| 3 — Assessment templates and score entry | 🚧 **IN PROGRESS** | — | Started 2026-11-02 on `markbook_phase_3`; verification step: all seven deliverables Missing (greenfield), foundation platform/access/academic/audit all Done |
+| 3 — Assessment templates and score entry | ✅ **COMPLETE** | 2026-11-06 | All exit criteria verified live: full suite **125 passed** (incl. 42 testcontainer tests), ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 4 — Calculation engine and processing | not started | — | |
 | 5 — Workflow, locking, publication, documents | not started | — | |
 | 6 — Web client | not started | — | |
@@ -93,6 +93,44 @@ BOM), adding the documented `app.people.service -> app.people.repository` self-i
 The Phase 2 RLS seed helper also gained the missing `schools` row insert (FK violation against a
 fabricated `uuid4()` school id). No commits were made in-session; the repair sits uncommitted in
 the working tree for the owner to commit.
+
+## Phase 3 status — COMPLETE 2026-11-06
+
+All Phase 3 deliverables are built and all exit criteria verified live (full suite **125 passed**,
+including 42 testcontainer tests). Sign-off detail and deviations are in
+[`09-phase-acceptance.md`](09-phase-acceptance.md).
+
+### Deliverables
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| assessment_templates + versioned definitions | ✅ Built | `assessment/models.py`, migration `0004`; `create_template` makes draft v1, `create_template_version` appends (max+1), edits never rewrite an existing version |
+| Version lifecycle (draft → active → retired) | ✅ Built | `activate_template_version`: activates target, retires the template's previous active, retired cannot reactivate (409) |
+| assessments (per term/class/section/subject) | ✅ Built | Natural key `UNIQUE NULLS NOT DISTINCT`; creation requires an **active** template version (draft → 422, dup → 409) |
+| Score entry with zero vs missing vs absent vs exempt | ✅ Built | `scores` CHECK `(status = 'entered') = (value IS NOT NULL)` — verified at the DB layer with raw SQL; `('entered', 0.00)` round-trips as a real zero |
+| Batch upsert (per-cell optimistic concurrency) | ✅ Built | Each row carries `base_version`; stale → conflict; no-op writes bump nothing; web batch is all-or-nothing with every bad cell reported |
+| score_changes ledger + `score.changed` outbox | ✅ Built | One ledger row + one outbox event per change, same transaction |
+| Bulk import as an async job | ✅ Built | `POST /assessments/{id}/scores/import` → 202 + durable `jobs` row; Arq trigger best-effort (`platform/job_queue.py`); `assessment/jobs.py::import_scores` applies valid rows, reports bad ones per CSV data-row number |
+| Teacher entry boundary (exit criterion) | ✅ Verified live | Direct HTTP: assigned-scope teacher outside assignment → 403 on PUT and on import enqueue; with a covering assignment → 200 |
+
+### Exit criteria
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| DB CHECK blocks invalid zero/missing combinations | ✅ Verified live | `tests/db/test_assessment.py` — 12 passed, raw-SQL inserts against the migrated testcontainer |
+| Editing a template creates a new version without altering existing assessments | ✅ Verified live | `TestTemplatesAndVersions` — v2 created as draft, activation retires v1, assessments keep their pinned version |
+| Teacher cannot enter scores outside assignment | ✅ Verified live | `TestTeacherScope` — 403 PERMISSION_DENIED over real HTTP with real role grants and RLS tenant context |
+
+**Measured gates, 2026-11-06 (final)** (run from `apps/api` with `.venv`):
+`ruff check` clean · `ruff format` clean (87 files) · `mypy src/app` → Success (59 files) ·
+`lint-imports` 4/4 KEPT · `pytest tests` → **125 passed**, incl. 42 testcontainer-gated tests.
+
+### Phase 3 notes
+
+- `platform/models.py` annotations moved from the shadowing dialect `UUID` to stdlib
+  `uuid.UUID` (runtime-neutral; column types unchanged) — found by mypy on the first run.
+- `GET /jobs/{job_id}` lives on the assessment router until a second job producer exists.
+- Score writes gate on `scores.enter`; `scores.edit` (edit-after-submit gating) is Phase 5.
 
 ## Phase 1 status — COMPLETE 2026-10-27
 
