@@ -26,10 +26,10 @@ def rank(results: Sequence[ComputedResult], scheme: EngineScheme) -> list[Ranked
         pairs.sort(key=lambda pair: (-pair[1], pair[0].subject_enrolment_id))
 
         out: list[RankedResult] = []
+        prev_total: Decimal | None = None
         if scheme.tie_policy == "competition":
             # Position = 1 + number of strictly better totals: 1, 1, 3, 4.
             better = 0
-            prev_total: Decimal | None = None
             for i, (r, total) in enumerate(pairs):
                 if prev_total is None or total != prev_total:
                     better = i
@@ -37,7 +37,6 @@ def rank(results: Sequence[ComputedResult], scheme: EngineScheme) -> list[Ranked
                 out.append(_with_position(r, better + 1))
         else:  # dense — position = index of the distinct total: 1, 1, 2, 3.
             position = 0
-            prev_total: Decimal | None = None
             for r, total in pairs:
                 if prev_total is None or total != prev_total:
                     position += 1

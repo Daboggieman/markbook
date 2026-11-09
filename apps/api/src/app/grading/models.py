@@ -121,7 +121,8 @@ class ProcessedResult(Base):
         UUID(as_uuid=True), ForeignKey("schools.id"), nullable=False
     )
     run_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("result_processing_runs.id", ondelete="CASCADE"),
+        UUID(as_uuid=True),
+        ForeignKey("result_processing_runs.id", ondelete="CASCADE"),
         nullable=False,
     )
     subject_enrolment_id: Mapped[uuid.UUID] = mapped_column(
