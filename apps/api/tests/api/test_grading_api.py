@@ -453,7 +453,7 @@ class TestSchemeLifecycle:
                 "/api/v1/grading-schemes", headers=world.auth(world.admin_token)
             )
         ).json()
-        by_no = {s["version_no"]: s["status"] for s in listing.json()}
+        by_no = {s["version_no"]: s["status"] for s in listing}
         assert by_no == {1: "retired", 2: "active"}
 
         r = await world.client.post(

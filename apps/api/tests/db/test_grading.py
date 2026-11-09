@@ -10,11 +10,12 @@ Raw SQL inserts, not the ORM: the point is what the DATABASE accepts.
 
 # ruff: noqa: S608  — fixed literal SQL against the testcontainer owner.
 
+import json
 from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 pytestmark = pytest.mark.db
@@ -135,10 +136,25 @@ async def ids(maker: async_sessionmaker) -> dict[str, UUID]:
             (
                 "INSERT INTO processed_results (id, school_id, run_id, subject_enrolment_id, "
                 "total, grade, position, breakdown, flags) "
-                "VALUES (:id, :s, :r, :se, 78.00, 'A', 1, "
-                "'[{\"component_key\": \"CA1\", \"status\": \"entered\", \"value\": \"8\", "
-                '"contribution": "8", "excluded": false}\']::jsonb, \'[]\'::jsonb)',
-                {"id": result, "s": school, "r": run, "se": subject_enrolment},
+                "VALUES (:id, :s, :r, :se, 78.00, 'A', 1, CAST(:bd AS jsonb), CAST(:fl AS jsonb))",
+                {
+                    "id": result,
+                    "s": school,
+                    "r": run,
+                    "se": subject_enrolment,
+                    "bd": json.dumps(
+                        [
+                            {
+                                "component_key": "CA1",
+                                "status": "entered",
+                                "value": "8",
+                                "contribution": "8",
+                                "excluded": False,
+                            }
+                        ]
+                    ),
+                    "fl": "[]",
+                },
             ),
         ]:
             await s.execute(text(stmt), params)
@@ -181,7 +197,9 @@ class TestSchemeConstraints:
             await s.commit()
 
     async def test_run_status_enum_blocks_junk(self, maker, ids) -> None:
-        with pytest.raises(IntegrityError):
+        """'cancelled' is not a runstatus label — a native-enum violation is a
+        DataError (SQLSTATE 22P02), not an integrity violation."""
+        with pytest.raises(DataError):
             async with maker() as s:
                 await s.execute(
                     text(
@@ -237,6 +255,11 @@ class TestRunAndResults:
         """A no-scoreable-components student stores NULL total/grade/position
         (the run still reports them — spec §9.2 step 8's flags carry the why)."""
         async with maker() as s:
+            # The fixture's own result occupies (run, subject_enrolment); this
+            # row models a DIFFERENT student's outcome in the same run.
+            await s.execute(
+                text("DELETE FROM processed_results WHERE run_id = :r"), {"r": ids["run"]}
+            )
             await s.execute(
                 text(
                     "INSERT INTO processed_results (id, school_id, run_id, "
@@ -244,7 +267,12 @@ class TestRunAndResults:
                     "VALUES (:id, :s, :r, :se, NULL, NULL, NULL, '[]'::jsonb, "
                     "'[\"no_scoreable_components\"]'::jsonb)"
                 ),
-                {"id": uuid4(), "s": ids["school"], "r": ids["run"], "se": ids["subject_enrolment"]},
+                {
+                    "id": uuid4(),
+                    "s": ids["school"],
+                    "r": ids["run"],
+                    "se": ids["subject_enrolment"],
+                },
             )
             await s.commit()
 
