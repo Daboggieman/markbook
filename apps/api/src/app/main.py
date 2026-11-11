@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.access.dependency import public
 from app.platform import db as platform_db
 from app.platform.config import get_settings
 from app.platform.errors import (
@@ -93,6 +94,8 @@ def create_app() -> FastAPI:
         return response
 
     # Health endpoint — used by the load balancer and docker healthcheck.
+    # @public: load balancer/healthcheck traffic carries no bearer token.
+    @public
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, Any]:
 
@@ -109,8 +112,9 @@ def create_app() -> FastAPI:
         }
 
     # Import and include routers here. Phase 1 adds identity and access routers.
-    # from app.identity.router import router as identity_router
-    # app.include_router(identity_router, prefix="/api/v1/identity", tags=["identity"])
+    from app.identity.router import router as identity_router
+
+    app.include_router(identity_router, prefix="/api/v1", tags=["identity"])
 
     return app
 

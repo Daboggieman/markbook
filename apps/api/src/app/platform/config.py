@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     argon2id_memory_cost: int = 65536
     argon2id_parallelism: int = 4
 
+    # Login throttling (spec §7.1)
+    login_max_failures: int = 5
+    login_lockout_seconds: int = 900  # 15 min
+    login_throttle_window_seconds: int = 900
+
     # Idempotency
     idempotency_key_ttl_seconds: int = 60 * 60 * 24  # 24 h per spec §8
 

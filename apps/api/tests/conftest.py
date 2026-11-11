@@ -6,7 +6,7 @@ Migrations run against a clean database, so `alembic upgrade head` is proven
 with every DB test run.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from uuid import UUID
 
@@ -19,7 +19,7 @@ SEED_SCHOOL_B = UUID("00000000-0000-7000-8000-00000000000b")
 
 
 @pytest.fixture(scope="session")
-def pg_url() -> str:
+def pg_url() -> Iterator[str]:
     """A real Postgres for the session (docker required)."""
     try:
         from testcontainers.community.postgres import PostgresContainer
