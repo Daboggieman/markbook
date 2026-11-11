@@ -131,9 +131,36 @@ last-SA API ×3, RLS isolation ×2) · `ruff check` clean · `ruff format --chec
 
 | Criterion | Verified | Command + result |
 | --- | --- | --- |
-| CHECK constraint enforced | — | — |
-| Template versioning | — | — |
-| Scored entry boundary | — | — |
+| CHECK constraint enforced | ✅ 2026-11-06 | `pytest tests/db/test_assessment.py -q` — 12 passed: raw-SQL inserts prove the DB blocks ('entered', NULL) and value-on-absent/exempt/missing (`chk_scores_entered_value`), while ('entered', 0.00) and non-entered NULL go through |
+| Template versioning | ✅ 2026-11-06 | `tests/api/test_assessment_api.py::TestTemplatesAndVersions` — editing creates version 2 draft; activation retires the previous active; retired → reactivate is 409 INVALID_STATE_TRANSITION; assessments pin their version (roster/scores read the pinned version) |
+| Teacher entry boundary | ✅ 2026-11-06 | `TestTeacherScope` over direct HTTP (real app, real grants, RLS context from the JWT): assigned-scope teacher outside their assignment → 403 PERMISSION_DENIED on PUT *and* on import enqueue; with a covering TeacherAssignment → 200, and GET /assessments lists exactly their assessment |
+
+**Full-suite gates, 2026-11-06** (run from `apps/api` with `.venv`; Docker Desktop running):
+`pytest tests` → **125 passed, 0 failed** (83 pre-Phase-3 + 14 unit + 12 db + 2 RLS + 16 API;
+42 testcontainer-gated) · `ruff check` clean · `ruff format` clean (87 files) ·
+`mypy src/app` → Success (59 files) · `lint-imports --config contracts.ini` → 4 kept, 0 broken.
+
+**Deviations from spec (recorded per rule 14):**
+- `assessments` natural key uses PG15+ `UNIQUE NULLS NOT DISTINCT` — requires Postgres 15+;
+  compose ships postgres 17, so no operational impact.
+- The `GET /jobs/{job_id}` status route lives on the assessment router in Phase 3 (assessment
+  is the only job producer); it moves to a shared home when a second producer appears.
+- Score-writing routes gate on `scores.enter` only; the `scores.edit` edit-after-submit gating
+  lands with Phase 5 workflow states (draft/returned are the editable states now).
+- Batch score upsert is all-or-nothing with ALL bad cells reported (`extra.errors` in the 422
+  body). When every reported row is a base_version conflict the response is 409
+  VERSION_CONFLICT instead of 422 — a concurrency failure is not a validation failure.
+
+**Test-harness fixes found on first run (2026-11-06, recorded for the next phase):**
+- `platform/models.py` shadowed stdlib `uuid.UUID` with the dialect type, so `Job`'s attrs
+  typed as the SQLAlchemy column type under mypy; annotations moved to `uuid.UUID`
+  (runtime-neutral — every mapped_column keeps its explicit `PgUUID(as_uuid=True)`).
+- arq 0.28's `RedisSettings` field is `database`, not `db` (`platform/job_queue.py`).
+- Shared-testcontainer hygiene: Phase 3 RLS seeds tag their level/class/session names
+  (`P3-*`) because the `two_schools` fixture's fixed schools already hold Phase 2's
+  untagged seeds and those names are UNIQUE per school.
+
+**Result: Phase 3 exit criteria all verified 2026-11-06.**
 
 ---
 

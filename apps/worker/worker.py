@@ -11,10 +11,8 @@ Run in docker: compose service `worker`.
 from collections.abc import Callable
 from typing import Any
 
-from arq.connections import RedisSettings
-from urllib.parse import urlparse
-
 from app.platform.config import get_settings
+from app.platform.job_queue import redis_settings_from_url
 from app.platform.logging import configure_logging, get_logger
 
 
@@ -31,8 +29,10 @@ async def shutdown(ctx: dict[str, Any]) -> None:
 
 # Job functions are registered here as they are added (Phase 2+).
 # Each job is idempotent and re-runnable (spec §12).
+from app.assessment.jobs import import_scores  # noqa: E402  — registered below
+
 JOB_FUNCTIONS: list[Callable[..., Any]] = [
-    # e.g. process_results, import_scores, generate_report_cards, verify_audit_chain
+    import_scores,
 ]
 
 # Periodic jobs are added when the first one ships (the nightly audit chain
@@ -51,19 +51,7 @@ class WorkerSettings:
     keep_result = 3600
 
 
-def _redis_settings_from_url(url: str) -> Any:
-    from arq.connections import RedisSettings
-
-    parsed = urlparse(url)
-    return RedisSettings(
-        host=parsed.hostname or "localhost",
-        port=parsed.port or 6379,
-        db=int(parsed.path.lstrip("/") or 0),
-        password=parsed.password,
-    )
-
-
-WorkerSettings.redis_settings = _redis_settings_from_url(get_settings().redis_url)
+WorkerSettings.redis_settings = redis_settings_from_url(get_settings().redis_url)
 
 
 if __name__ == "__main__":
