@@ -35,19 +35,22 @@ async def _seed_school(maker: async_sessionmaker, school_id: UUID) -> None:
         await s.commit()
 
 
-async def _seed_super_admin(maker: async_sessionmaker, school_id: UUID, sa_id: UUID) -> None:
+async def _seed_super_admin(
+    maker: async_sessionmaker, school_id: UUID, sa_id: UUID, *, is_super_admin: bool = True
+) -> None:
     async with maker() as s:
         await s.execute(
             text(
                 "INSERT INTO users (id, school_id, email, username, password_hash, "
                 "is_super_admin, status, token_version, failed_login_count) "
-                "VALUES (:id, :school, :email, :username, 'x', true, 'active', 1, 0)"
+                "VALUES (:id, :school, :email, :username, 'x', :sa, 'active', 1, 0)"
             ),
             {
                 "id": str(sa_id),
                 "school": str(school_id),
                 "email": f"{sa_id.hex[:8]}@sa.local",
                 "username": f"sa{sa_id.hex[:8]}",
+                "sa": is_super_admin,
             },
         )
         await s.commit()
@@ -90,7 +93,9 @@ async def test_deactivate_revokes_sessions_and_bumps_token_version(
 
     school_id, user_id = uuid4(), uuid4()
     await _seed_school(maker, school_id)
-    await _seed_super_admin(maker, school_id, user_id)
+    # A plain user: a lone Super Admin would hit the 409 guard before the
+    # revocation path this test exercises.
+    await _seed_super_admin(maker, school_id, user_id, is_super_admin=False)
 
     async with maker() as session:
         session.add(
@@ -108,6 +113,8 @@ async def test_deactivate_revokes_sessions_and_bumps_token_version(
         svc = IdentityService(session)
         user = await svc.set_user_status(user_id=user_id, new_status="suspended")
         assert user.status == "suspended"
+        # The router commits after the service call; mirror that contract here.
+        await session.commit()
 
     async with maker() as s:
         revoked = (

@@ -6,7 +6,8 @@ Migrations run against a clean database, so `alembic upgrade head` is proven
 with every DB test run.
 """
 
-from collections.abc import AsyncIterator, Iterator
+import sys
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping
 from pathlib import Path
 from uuid import UUID
 
@@ -16,6 +17,18 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 SEED_SCHOOL_A = UUID("00000000-0000-7000-8000-00000000000a")
 SEED_SCHOOL_B = UUID("00000000-0000-7000-8000-00000000000b")
+
+if sys.platform == "win32":
+    # psycopg async refuses ProactorEventLoop (the Python ≥3.8 Windows default).
+    # The pytest_asyncio_loop_factories hook is pytest-asyncio's supported way to
+    # control loop creation; on non-Windows platforms no hook is registered and
+    # default loop creation is untouched.
+    import asyncio
+
+    def pytest_asyncio_loop_factories(
+        config: pytest.Config, item: pytest.Item
+    ) -> Mapping[str, Callable[[], asyncio.AbstractEventLoop]]:
+        return {"selector": asyncio.SelectorEventLoop}
 
 
 @pytest.fixture(scope="session")
@@ -35,6 +48,31 @@ def pg_url() -> Iterator[str]:
         if parsed.port:
             netloc += f":{parsed.port}"
         url = urlunparse((parsed.scheme, netloc, parsed.path, "", "", ""))
+
+        # Create extensions required by migrations before any fixture reads url.
+        import psycopg
+
+        def _as_libpq(conn_url: str) -> str:
+            """Convert a postgresql+psycopg:// URL to a libpq keyword string."""
+            from urllib.parse import urlparse
+
+            p = urlparse(conn_url)
+            kw = {
+                k: v
+                for k, v in [
+                    ("host", p.hostname),
+                    ("port", p.port or 5432),
+                    ("dbname", p.path.lstrip("/") or "postgres"),
+                    ("user", p.username),
+                    ("password", p.password),
+                ]
+                if v
+            }
+            return " ".join(f"{k}={v}" for k, v in kw.items())
+
+        with psycopg.connect(_as_libpq(url)) as conn:
+            conn.execute("CREATE EXTENSION IF NOT EXISTS citext")
+            conn.commit()
         yield url
 
 

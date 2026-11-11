@@ -147,12 +147,14 @@ def _upgrade() -> None:
         CREATE TABLE user_roles (
             user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             role_id     UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+            school_id   UUID NOT NULL REFERENCES schools(id),
             granted_by  UUID REFERENCES users(id),
             granted_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
             PRIMARY KEY (user_id, role_id)
         )
         """
     )
+    op.execute("CREATE INDEX ix_user_roles_school_id ON user_roles (school_id)")
 
     # --- RLS --------------------------------------------------------------
     # sessions: no RLS — the refresh token hash IS the bearer credential.
