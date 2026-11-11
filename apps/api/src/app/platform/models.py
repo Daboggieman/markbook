@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, DateTime, LargeBinary, String
+from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -45,7 +46,10 @@ class AuditEvent(Base):
     school_id: Mapped[UUID | None] = mapped_column(PgUUID(as_uuid=True), nullable=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     actor_id: Mapped[UUID | None] = mapped_column(PgUUID(as_uuid=True), nullable=True)
-    actor_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)  # IPv4/IPv6
+    # INET — the migration's DDL (0001) is the type of record; a String here
+    # binds NULL/str as VARCHAR, which Postgres cannot assign to an inet
+    # column (no such cast) — every ORM audit insert would fail.
+    actor_ip: Mapped[str | None] = mapped_column(INET, nullable=True)
     action: Mapped[str] = mapped_column(String(100), nullable=False)
     entity_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     entity_id: Mapped[UUID | None] = mapped_column(PgUUID(as_uuid=True), nullable=True)

@@ -17,6 +17,7 @@ from sqlalchemy import text
 # Topics at launch (spec §12). Do not invent topics ad hoc; add here.
 TOPIC_ASSESSMENT_STATE_CHANGED = "assessment.state_changed"
 TOPIC_RESULTS_PUBLISHED = "results.published"
+TOPIC_RESULTS_PROCESSED = "results.processed"  # Phase 4 — a run succeeded
 TOPIC_SCORE_CHANGED = "score.changed"
 
 

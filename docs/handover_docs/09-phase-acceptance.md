@@ -174,10 +174,36 @@ last-SA API ×3, RLS isolation ×2) · `ruff check` clean · `ruff format --chec
 
 | Criterion | Verified | Command + result |
 | --- | --- | --- |
-| Golden examples | — | — |
-| Boundary / property tests | — | — |
-| Determinism (`input_hash`) | — | — |
-| Coverage ≥ 90% | — | — |
+| Golden examples | ✅ 2026-11-11 | `pytest tests/unit/test_grading_engine.py tests/api/test_grading_api.py` → 59 passed. Spec §9.3 over real HTTP: Ada 8+7+15+48 = **78 A**; Bayo 6+5+12+40 = **63 B**; Chidi 49.5 → HALF_UP **50 C**; Dara (CA2 absent → treat_zero) **79 A**; Efe (Test exempt → 58/80·100 = 72.5 → **73 A**, `renormalised`). Breakdown cells, dense positions 1–5, and flag exclusivity asserted |
+| Boundary / property tests | ✅ 2026-11-11 | `TestBoundaryEdges` — totals 39/40/44/45/69/70/100 land F/E/E/D/B/A/A; policy matrix (missing block/treat_zero/flag_incomplete, absent treat_zero/exclude, exempt always excluded, all-excluded → `no_scoreable_components`, full-precision 1/3·30 → 10); `TestRanking` dense 1,2,2,3 vs competition 1,2,2,4 |
+| Determinism (`input_hash`) | ✅ 2026-11-11 | Unit `TestDeterminism` + API `test_identical_inputs_produce_identical_outputs`: two runs of the same scores+scheme → same 64-hex `input_hash`, identical (total, grade, position, flags) fingerprint, both runs retained in history |
+| Coverage ≥ 90% | ✅ 2026-11-11 | `pytest tests --cov=app.grading` → **96%** total (scheme.py 100%, repository/router/schemas/models 100%, service 94%, compute 94%, jobs 86% — the jobs misses are defensive crash/settled paths) |
+
+#### Phase 4 notes and deviations (2026-11-11)
+
+- **Phase 2 latent bug fixed: `AuditEvent.actor_ip`** was `String(45)` in the model against
+  `INET` in migration 0001. Postgres has no varchar→inet cast, so **every ORM audit insert
+  failed** (`DatatypeMismatch`) — Phase 4 was simply the first suite to write an audit row
+  through the ORM. Model now declares `INET` (same as `identity/models.py`'s `ip`).
+  The Phase 2 audit-coverage gap this exposed: audit *writes* were never exercised before.
+- `pytest-cov>=6.0` added to the `dev` extra (the Phase 4 coverage gate needed a runner).
+- `result_processing_runs` carries an `error TEXT` column not in the spec's data model —
+  a failed run must record WHY (run history is the record of record); documented in the
+  migration and `models.py`.
+- `grading_schemes` is **row-per-version**: family = (school_id, name), each row its own
+  `version_no` (UNIQUE in the migration only, deliberately not in the model — see
+  `models.py` comment). Runs cite the exact version row (`scheme_id`) with
+  `scheme_version` denormalized.
+- Permission mapping (the seeded catalogue has no scheme/results read permission):
+  scheme read → `assessments.view`; scheme create/activate → `assessments.manage`;
+  process → `results.process`; runs/results read → `scores.view`. A dedicated
+  `results.view` is a Phase 8 hardening candidate. Rationale documented in the router.
+- `GET /jobs/{job_id}` remains on the assessment router (platform-kernel contract forbids
+  platform importing `access.dependency`); the grading 202 returns its `status_url`.
+- `jobs._settle_failed` must call `set_tenant_context` before updating the failed run —
+  a fresh transaction has no `app.school_id`, and the RLS update would silently match
+  zero rows. Caught in review before first run; the failure path is exercised by
+  `TestBlockedRun`.
 
 ---
 

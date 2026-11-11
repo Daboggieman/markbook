@@ -228,8 +228,7 @@ class TestUniqueness:
         async with maker() as s:
             await s.execute(
                 text(
-                    "INSERT INTO sections (id, school_id, class_id, name) "
-                    "VALUES (:id, :s, :c, 'A')"
+                    "INSERT INTO sections (id, school_id, class_id, name) VALUES (:id, :s, :c, 'A')"
                 ),
                 {"id": section, "s": ids["school"], "c": ids["class"]},
             )
