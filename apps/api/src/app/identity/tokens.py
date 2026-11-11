@@ -25,13 +25,15 @@ def create_access_token(
     session_id: uuid.UUID,
     is_super_admin: bool = False,
     reauth_at: int | None = None,
+    reauth_mfa: bool = False,
 ) -> tuple[str, int]:
     """Return (encoded_jwt, ttl_seconds).
 
     `reauth_at` (epoch seconds) is set only by POST /auth/reauth — a fresh
-    credential check. Sensitive routes (lock/publish/correct, spec §7.1)
-    require a reauth within the last REAUTH_WINDOW_SECONDS; a normal login
-    token carries no claim, so it never satisfies the window.
+    credential check. Sensitive routes (lock/publish, spec §7.1) require a
+    reauth within the last REAUTH_WINDOW_SECONDS; a normal login token
+    carries no claim, so it never satisfies the window. `reauth_mfa` is set
+    only when that reauth verified a TOTP code — publish requires it.
     """
     settings = get_settings()
     now = datetime.now(UTC)
@@ -49,6 +51,8 @@ def create_access_token(
         claims["super"] = True
     if reauth_at is not None:
         claims["reauth_at"] = reauth_at
+    if reauth_mfa:
+        claims["reauth_mfa"] = True
     token = jwt.encode(claims, settings.jwt_secret, algorithm=settings.jwt_algorithm)
     return token, ttl
 

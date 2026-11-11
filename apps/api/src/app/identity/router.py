@@ -10,7 +10,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 
-from app.access.dependency import get_actor_db, public, require
+from app.access.dependency import authenticated, get_actor_db, public, require
 from app.access.service import Actor
 from app.identity import schemas
 from app.identity.service import IdentityService
@@ -83,6 +83,31 @@ async def logout(
     repo = IdentityRepository(session)
     await repo.revoke_session(actor.session_id)
     return {"status": "logged_out"}
+
+
+@router.post("/reauth", response_model=schemas.ReauthResponse)
+async def reauth(
+    body: schemas.ReauthRequest,
+    actor: Actor = Depends(authenticated()),
+    session=Depends(get_actor_db),
+) -> schemas.ReauthResponse:
+    """Step-up credential check (spec 7.1).
+
+    Verifies the password (and the TOTP code when the user has MFA enabled)
+    and returns a NEW access token for the SAME session carrying a
+    `reauth_at` claim. Sensitive routes (lock, publish) require that claim
+    to be within the last 5 minutes; publish additionally requires the MFA
+    flag on the claim. The caller's original token remains valid but never
+    satisfies those routes.
+    """
+    service = IdentityService(session)
+    token, ttl = await service.reauth(
+        user_id=actor.user_id,
+        session_id=actor.session_id,
+        password=body.password,
+        totp_code=body.totp_code,
+    )
+    return schemas.ReauthResponse(access_token=token, expires_in=ttl)
 
 
 # ---------------------------------------------------------------------------

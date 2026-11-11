@@ -25,6 +25,7 @@ from app.access.service import (
     authorize,
     scope_filter,
 )
+from app.platform.config import get_settings
 from app.platform.db import get_sessionmaker, set_tenant_context
 from app.platform.errors import PERMISSION_DENIED, ProblemError
 from app.platform.logging import get_logger
@@ -181,6 +182,64 @@ def require_with_scope(
                 grants = await _load_grants(session, actor.user_id)
         scope = scope_filter(grants, permission)
         return actor, scope
+
+    return dependency
+
+
+def authenticated() -> Callable[[Request], Awaitable[Actor]]:
+    """Authenticate only — no permission. For self-service routes whose
+    whole point is re-proving identity (POST /auth/reauth): requiring a
+    permission there would exclude exactly the users who need the endpoint.
+    Satisfies the route-coverage guard (a real authentication dependency)."""
+
+    async def dependency(request: Request) -> Actor:
+        return await _authenticate(request)
+
+    return dependency
+
+
+def require_reauth(*, require_mfa: bool = False) -> Callable[[Request], Awaitable[Actor]]:
+    """Step-up gate for sensitive routes (spec §7.1/§10): the bearer token
+    must carry a `reauth_at` claim minted by POST /auth/reauth within the
+    last REAUTH_WINDOW_SECONDS (5 min default).
+
+    `require_mfa=True` (publish) additionally requires that the reauth was
+    completed WITH a TOTP code — the claim is only set when the user's MFA
+    was verified, so a user without MFA enrolled can never satisfy it
+    (MFA is mandatory for roles holding results.publish, spec §7.1).
+
+    A normal login token has no `reauth_at` claim and never satisfies the
+    window — the claim cannot be forged without the JWT secret, and it is
+    bounded by the access token's own expiry.
+    """
+    from datetime import UTC, datetime
+
+    from app.platform.errors import MFA_REQUIRED, REAUTH_REQUIRED
+
+    async def dependency(request: Request) -> Actor:
+        actor = await _authenticate(request)
+        claims = decode_bearer(request)
+        reauth_at = claims.get("reauth_at")
+        if not reauth_at:
+            raise ProblemError(
+                REAUTH_REQUIRED,
+                "This action requires recent re-authentication; call POST /auth/reauth",
+                status=401,
+            )
+        window = get_settings().reauth_window_seconds
+        if int(reauth_at) < int(datetime.now(UTC).timestamp()) - window:
+            raise ProblemError(
+                REAUTH_REQUIRED,
+                "Re-authentication has expired; call POST /auth/reauth again",
+                status=401,
+            )
+        if require_mfa and not claims.get("reauth_mfa"):
+            raise ProblemError(
+                MFA_REQUIRED,
+                "Publishing requires MFA; re-authenticate with your TOTP code",
+                status=401,
+            )
+        return actor
 
     return dependency
 

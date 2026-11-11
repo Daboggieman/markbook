@@ -341,5 +341,6 @@ class IdentityService:
             token_version=user.token_version,
             session_id=session_id,
             reauth_at=int(datetime.now(UTC).timestamp()),
+            reauth_mfa=user.mfa_enabled,  # TOTP verified above iff mfa_enabled
         )
         return token, ttl

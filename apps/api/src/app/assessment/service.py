@@ -281,14 +281,16 @@ class AssessmentService:
 
     # ---- score entry -----------------------------------------------------------
 
-    async def _check_enter_scope(self, assessment: Assessment, actor: Actor, scope: str) -> None:
+    async def _check_enter_scope(
+        self, assessment: Assessment, actor: Actor, scope: str, permission: str = "scores.enter"
+    ) -> None:
         """The Phase 3 exit criterion: a teacher with only the `assigned`
         scope may not write a score outside their assignments. `school` scope
         (admin) passes; `own` is meaningless for scores and denied."""
         if scope == "school":
             return
         if scope != "assigned":
-            raise ProblemError(PERMISSION_DENIED, "scores.enter requires school or assigned scope")
+            raise ProblemError(PERMISSION_DENIED, f"{permission} requires school or assigned scope")
 
         term = await self._one_or_404(
             Term, school_id=assessment.school_id, id_=assessment.term_id, label="Term"
@@ -315,6 +317,15 @@ class AssessmentService:
                 "You are not assigned to this class/subject for the assessment's session",
                 status=403,
             )
+
+    async def check_transition_scope(
+        self, assessment: Assessment, actor: Actor, scope: str, permission: str
+    ) -> None:
+        """Public seam for the workflow module (Phase 5): `scores.submit` and
+        `scores.review` are scoped actions like score entry — a teacher with
+        only the `assigned` scope may act only on assessments inside their
+        assignments. Same assignment resolution, one definition."""
+        await self._check_enter_scope(assessment, actor, scope, permission=permission)
 
     async def _editable_assessment(self, school_id: UUID, assessment_id: UUID) -> Assessment:
         assessment = await self.get_assessment(school_id, assessment_id)
