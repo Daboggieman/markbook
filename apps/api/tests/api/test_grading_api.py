@@ -275,7 +275,7 @@ async def _seed_world(maker: async_sessionmaker) -> World:
                     {"id": ses[name], "s": school, "e": enrols[name], "cs": class_subject},
                 )
                 for name in GOLDEN_SCORES
-            ]
+            ],
         ]
         for stmt, params in stmts:
             await s.execute(text(stmt), params)
@@ -449,9 +449,7 @@ class TestSchemeLifecycle:
         await _activate(world, v2)
 
         listing = (
-            await world.client.get(
-                "/api/v1/grading-schemes", headers=world.auth(world.admin_token)
-            )
+            await world.client.get("/api/v1/grading-schemes", headers=world.auth(world.admin_token))
         ).json()
         by_no = {s["version_no"]: s["status"] for s in listing}
         assert by_no == {1: "retired", 2: "active"}

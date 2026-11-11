@@ -11,7 +11,8 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, DateTime, LargeBinary, String
-from sqlalchemy.dialects.postgresql import INET, UUID as PgUUID
+from sqlalchemy.dialects.postgresql import INET
+from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 

@@ -397,6 +397,45 @@ class TestSchemeValidation:
         with pytest.raises(ValueError, match="precision"):
             self.build(precision=-1)
 
+    def test_integral_decimal_and_str_bounds_accepted(self):
+        """The raw-dict path (build_scheme without pydantic): exactly
+        integral Decimal/str bounds coerce — the engine is the authority."""
+        parsed = self.build(
+            boundaries=[
+                {"grade": "A", "min": Decimal("70"), "max": "100"},
+                {"grade": "B", "min": "0", "max": Decimal("69")},
+            ]
+        )
+        assert parsed == (Boundary("B", 0, 69), Boundary("A", 70, 100))
+
+    def test_non_integral_and_junk_bounds_rejected(self):
+        with pytest.raises(ValueError, match="must be an integer"):
+            self.build(boundaries=[{"grade": "A", "min": Decimal("70.5"), "max": 100}])
+        with pytest.raises(ValueError, match="must be an integer"):
+            self.build(boundaries=[{"grade": "A", "min": "seventy", "max": 100}])
+        with pytest.raises(ValueError, match="must be an integer"):
+            self.build(boundaries=[{"grade": "A", "min": True, "max": 100}])
+        with pytest.raises(ValueError, match="must be an integer"):
+            self.build(boundaries=[{"grade": "A", "min": [70], "max": 100}])
+
+    def test_precision_must_be_an_int(self):
+        with pytest.raises(ValueError, match="precision"):
+            self.build(precision="1")
+        with pytest.raises(ValueError, match="precision"):
+            self.build(precision=True)
+
+    def test_boundary_shape_rejected(self):
+        with pytest.raises(ValueError, match="at least one boundary"):
+            self.build(boundaries=[])
+        with pytest.raises(ValueError, match="must be an object"):
+            self.build(boundaries=["A"])
+        with pytest.raises(ValueError, match="non-empty grade"):
+            self.build(boundaries=[{"grade": "  ", "min": 0, "max": 100}])
+        with pytest.raises(ValueError, match="non-empty grade"):
+            self.build(boundaries=[{"grade": None, "min": 0, "max": 100}])
+        with pytest.raises(ValueError, match="remark must be a string"):
+            self.build(boundaries=[{"grade": "A", "min": 0, "max": 100, "remark": 7}])
+
     def test_build_scheme_round_trip(self):
         scheme = build_scheme(
             rounding_mode="ROUND_HALF_UP",
