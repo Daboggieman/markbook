@@ -60,11 +60,29 @@ Read edges: `assessment.repository` joins `academic.models` (Enrolment, ClassSub
 SubjectEnrolment, Term, TeacherAssignment) and `people.models` (Student) for the score-sheet
 roster — models only, never another module's repository (the Phase 2 precedent).
 
-### grading service
+### grading service (Phase 4)
 
-- `process_results(assessment_id, scheme_id, actor)` → `Job`  # async
-- `get_processing_runs(assessment_id)` → list[`ResultProcessingRun`]
-- `get_processed_results(assessment_id)` → list[`ProcessedResult`]
+- `create_scheme(school_id, data, actor)` → `GradingScheme`  # new name → draft v1; same name → the NEXT version (editing never rewrites, spec §9.4)
+- `list_schemes(school_id)` → list[`GradingScheme`] / `get_scheme(school_id, scheme_id)` → `GradingScheme`
+- `activate_scheme(school_id, scheme_id, actor)` → `GradingScheme`  # draft → active, retires the previous active of the same name; retired can't reactivate (409)
+- `enqueue_process(school_id, assessment_id, scheme_id, actor)` → (`Job`, `ResultProcessingRun`)  # scheme version must be active; run pins scheme version + the assessment's template version
+- `apply_run(school_id, run_id, actor)` → dict  # the deterministic core — worker-side only (`grading.jobs::process_results`); idempotent on already-settled runs
+- `list_runs(school_id, assessment_id)` → list[`ResultProcessingRun`]  # run history, newest first
+- `get_results(school_id, assessment_id)` → (`ResultProcessingRun`, list[(`ProcessedResult`, `student_name`)])  # the latest SUCCEEDED run in report-card order; 404 before any
+
+The pure engine (`grading/engine/`, mypy-strict, fenced by the `engine-is-pure` import-linter
+contract): `compute(student_scores, template, scheme)` → `ComputedResult` (one student);
+`rank(results, scheme)` → list[`RankedResult`] (dense/competition); `build_scheme` /
+`validate_scheme` (contiguous integer bands 0..100 — the single authority on scheme validity);
+`input_hash(scores)` → 64-hex SHA-256 over the canonical score serialization (spec §9.4).
+
+*Cross-module call note:* `grading.service` consumes `AssessmentService.get_sheet()` — a
+service-interface edge (legal under `no-cross-repository`), so there is one definition of
+"what is on the sheet" with two consumers. `grading.repository` joins `academic.models`
+(SubjectEnrolment, Enrolment) and `people.models` (Student) for display names — models only,
+never another module's repository. `missing_policy=block` fails the WHOLE run (blocked
+students listed in the run's `error`); a student with every component excluded is stored
+with NULL total/grade/position and the `no_scoreable_components` flag.
 
 ### workflow service
 

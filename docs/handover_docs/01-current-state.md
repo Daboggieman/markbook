@@ -1,9 +1,9 @@
-# Current state — 2026-11-06
+# Current state — 2026-11-11
 
-> **Working branch: `markbook_phase_3`** (cut from the `markbook_phase_2` tip `f1a5b97`,
-> 2026-11-02, at Phase 3 start). Phase 2 lives on `markbook_phase_2`; Phase 1 on
-> `markbook_phase_1`; Phase 0 on `markbook_phase_0` / `master` (PR #1).
-> Next: cut `markbook_phase_4` from the `markbook_phase_3` tip when Phase 4 starts.
+> **Working branch: `markbook_phase_4`** (cut from the `markbook_phase_3` tip `4a8c23c`,
+> 2026-11-11, at Phase 4 start). Phase 3 lives on `markbook_phase_3`; Phase 2 on
+> `markbook_phase_2`; Phase 1 on `markbook_phase_1`; Phase 0 on `markbook_phase_0` / `master` (PR #1).
+> Next: Phase 5 — workflow, locking, publication, documents.
 
 ## Phase board
 
@@ -13,7 +13,7 @@
 | 1 — Identity, access, audit | ✅ **COMPLETE** | 2026-10-27 | All exit criteria verified live: full suite 68 passed (incl. 10 testcontainer tests), ruff/mypy clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 2 — People and academic structure | ✅ **COMPLETE** | 2026-11-02 | All exit criteria verified live: full suite **83 passed** (incl. 25 testcontainer tests), ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 3 — Assessment templates and score entry | ✅ **COMPLETE** | 2026-11-06 | All exit criteria verified live: full suite **125 passed** (incl. 42 testcontainer tests), ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
-| 4 — Calculation engine and processing | not started | — | |
+| 4 — Calculation engine and processing | ✅ **COMPLETE** | 2026-11-11 | All exit criteria verified live: full suite **193 passed** (incl. 77 testcontainer-gated tests), coverage on `app.grading` **96%**, ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 5 — Workflow, locking, publication, documents | not started | — | |
 | 6 — Web client | not started | — | |
 | 7 — Desktop client and sync | not started | — | |
@@ -93,6 +93,48 @@ BOM), adding the documented `app.people.service -> app.people.repository` self-i
 The Phase 2 RLS seed helper also gained the missing `schools` row insert (FK violation against a
 fabricated `uuid4()` school id). No commits were made in-session; the repair sits uncommitted in
 the working tree for the owner to commit.
+
+## Phase 4 status — COMPLETE 2026-11-11
+
+All Phase 4 deliverables are built and all exit criteria verified live (full suite **193 passed**,
+including 77 testcontainer-gated tests; coverage on `app.grading` **96%**). Sign-off detail and
+deviations are in [`09-phase-acceptance.md`](09-phase-acceptance.md).
+
+### Deliverables
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| Pure calculation engine | ✅ Built | `grading/engine/` — `compute` / `rank` / `scheme` / `hashing` / `types`; no I/O, no framework imports, Decimal with a pinned `localcontext(prec=50)` so global context can't shift outputs. Enforced by the `engine-is-pure` import-linter contract |
+| Versioned grading schemes | ✅ Built | `grading_schemes` row-per-version (migration `0005`): new name → draft v1, same name → next version, activation retires the previous active, retired can't reactivate (409). Engine `validate_scheme` is the single authority (contiguous integer bands 0..100) |
+| Processing job + runs | ✅ Built | `POST /assessments/{id}/process` → 202 + durable Job + `queued` run; `grading/jobs.py::process_results` (worker) → `apply_run`: `running` → compute → `succeeded` with `input_hash`; failures settle job AND run from a fresh transaction (with tenant context — see note) |
+| Processed results + ranking | ✅ Built | `processed_results` (UNIQUE per run+enrolment, run `ON DELETE CASCADE`); dense/competition ranking; report-card order (position, name) via the results endpoint |
+| Run history + recalculation | ✅ Built | `GET /assessments/{id}/processing-runs` newest first; recalculation is an explicit re-POST creating a NEW run; current = latest **succeeded**; failed runs never become current (proven by `TestBlockedRun`) |
+| Blocked-run semantics | ✅ Verified live | `missing_policy=block` with an unscored student fails the WHOLE run (error lists the blocked enrolments); the prior successful run stays current untouched |
+| Golden example §9.3 end-to-end | ✅ Verified live | Scores via the sheet API, scheme via the grading API, job via the worker entry point, results read back: 78 A / 63 B / 49.5→50 C / 79 A / 72.5→73 A + `renormalised`, dense positions 1–5 |
+
+### Exit criteria
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| All golden examples pass | ✅ Verified live | Unit `TestGoldenExample` (engine-level) + `TestGoldenFlow.test_golden_example_end_to_end` (HTTP-level, spec §9.3's five students) |
+| Boundary and property tests pass | ✅ Verified live | Boundary edges 39/40/44/45/69/70/100; policy matrix; tie policies; rounding-once property (49.5 → 50, 1/3·30 → 10 at full precision) |
+| Identical inputs → identical `input_hash` and outputs | ✅ Verified live | Two processing runs: same 64-hex hash, identical result fingerprint, both runs retained |
+| Coverage on `grading` ≥ 90% | ✅ Verified live | `pytest tests --cov=app.grading` → **96%** (all files ≥ 86%) |
+
+**Measured gates, 2026-11-11 (final)** (run from `apps/api` with `.venv`):
+`ruff check` clean · `ruff format` clean (100 files) · `mypy src/app` → Success (69 files) ·
+`lint-imports` 4/4 KEPT · `pytest tests` → **193 passed**, incl. 77 testcontainer-gated tests.
+
+### Phase 4 notes
+
+- The new tests exposed and fixed a **Phase 2 latent bug**: `AuditEvent.actor_ip` was
+  `String(45)` against the DDL's `INET` — every ORM audit insert failed. See the
+  acceptance record for the full note.
+- `pytest-cov` added to the `dev` extra (coverage gate needed a runner).
+- Grading consumes `AssessmentService.get_sheet()` (service-interface edge, legal under
+  `no-cross-repository`) — one definition of "what is on the sheet", two consumers.
+- Worker job failure settlement is RLS-sensitive: `set_tenant_context` before the run
+  UPDATE, or the fresh transaction matches zero rows silently.
 
 ## Phase 3 status — COMPLETE 2026-11-06
 
