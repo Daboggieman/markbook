@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_ttl_seconds: int = 900  # 10-15 min per spec §7.1
     refresh_token_ttl_seconds: int = 60 * 60 * 24 * 14
+    reauth_window_seconds: int = 300  # step-up credential check validity (spec §7.1)
     argon2id_time_cost: int = 3
     argon2id_memory_cost: int = 65536
     argon2id_parallelism: int = 4

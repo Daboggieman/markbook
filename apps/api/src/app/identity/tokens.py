@@ -24,8 +24,15 @@ def create_access_token(
     token_version: int,
     session_id: uuid.UUID,
     is_super_admin: bool = False,
+    reauth_at: int | None = None,
 ) -> tuple[str, int]:
-    """Return (encoded_jwt, ttl_seconds)."""
+    """Return (encoded_jwt, ttl_seconds).
+
+    `reauth_at` (epoch seconds) is set only by POST /auth/reauth — a fresh
+    credential check. Sensitive routes (lock/publish/correct, spec §7.1)
+    require a reauth within the last REAUTH_WINDOW_SECONDS; a normal login
+    token carries no claim, so it never satisfies the window.
+    """
     settings = get_settings()
     now = datetime.now(UTC)
     ttl = settings.access_token_ttl_seconds
@@ -40,6 +47,8 @@ def create_access_token(
     }
     if is_super_admin:
         claims["super"] = True
+    if reauth_at is not None:
+        claims["reauth_at"] = reauth_at
     token = jwt.encode(claims, settings.jwt_secret, algorithm=settings.jwt_algorithm)
     return token, ttl
 

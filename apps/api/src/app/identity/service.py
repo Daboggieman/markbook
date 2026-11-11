@@ -297,3 +297,49 @@ class IdentityService:
         if not user.mfa_secret:
             return False
         return pyotp.TOTP(user.mfa_secret).verify(totp_code, valid_window=1)
+
+    # ---- step-up re-auth (Phase 5, spec §7.1) -------------------------------
+
+    async def reauth(
+        self,
+        *,
+        user_id: uuid.UUID,
+        session_id: uuid.UUID,
+        password: str,
+        totp_code: str | None = None,
+    ) -> tuple[str, int]:
+        """Fresh credential check for sensitive operations (lock/publish).
+
+        Returns a NEW access token for the SAME session with a `reauth_at`
+        claim — the caller's original token stays valid but does not satisfy
+        the reauth window. `session_id` comes from the caller's verified JWT
+        (the reauth endpoint is only reachable by an authenticated actor), so
+        the step-up token cannot outlive the session it was minted for.
+        Deliberately no lockout/throttling on failure: the caller is already
+        an authenticated principal, and a stolen-token attacker gains nothing
+        by seeing 401s. Wrong password is a plain 401.
+        """
+        user = await self._repo.get_user_by_id(user_id)
+        if user is None or user.status != "active":
+            raise ProblemError(ACCOUNT_NOT_ACTIVE, "Account is not active", status=403)
+
+        if not _password_context().verify(password, user.password_hash):
+            raise ProblemError(INVALID_CREDENTIALS, "Invalid password", status=401)
+
+        if user.mfa_enabled:
+            if not totp_code:
+                raise ProblemError(
+                    MFA_REQUIRED, "MFA code required to complete re-authentication", status=401
+                )
+            if not await self.verify_mfa(user, totp_code):
+                raise ProblemError(INVALID_CREDENTIALS, "Invalid MFA code", status=401)
+
+        settings = get_settings()
+        token, ttl = create_access_token(
+            user_id=user.id,
+            school_id=user.school_id,
+            token_version=user.token_version,
+            session_id=session_id,
+            reauth_at=int(datetime.now(UTC).timestamp()),
+        )
+        return token, ttl

@@ -49,7 +49,21 @@ class MfaSetupResponse(BaseModel):
 
 
 class ReauthRequest(BaseModel):
+    """Step-up credential check (spec §7.1).
+
+    `totp_code` is required at the service layer when the user has MFA
+    enabled — declared optional here so the error can distinguish "MFA
+    required" (401 MFA_REQUIRED) from "code wrong" (401).
+    """
+
     password: Annotated[str, Field(min_length=1)]
+    totp_code: Annotated[str | None, Field(pattern=r"^\d{6}$")] = None
+
+
+class ReauthResponse(BaseModel):
+    access_token: str
+    expires_in: int
+    token_type: str = "bearer"
 
 
 # ---------------------------------------------------------------------------
