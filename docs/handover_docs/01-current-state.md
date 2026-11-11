@@ -1,15 +1,17 @@
-# Current state — 2026-10-27
+# Current state — 2026-11-02
 
-> **Working branch: `markbook_phase_1`** (cut from `markbook_phase_0`, 2026-10-27).
-> Phase 0 lives on `markbook_phase_0` / `master` (PR #1). Phase 1 work sits on `markbook_phase_1`.
+> **Working branch: `markbook_phase_2`** (cut from `markbook_phase_1` tip; Phase 2 commits
+> 2026-10-28 → 2026-10-30, plus the 2026-11-02 gate repair). Phase 1 lives on
+> `markbook_phase_1`; Phase 0 on `markbook_phase_0` / `master` (PR #1).
+> Next: cut `markbook_phase_3` from the `markbook_phase_2` tip when Phase 3 starts.
 
 ## Phase board
 
 | Phase | Status | Verified | Notes |
 |---|---|---|---|
 | 0 — Foundations | ✅ **COMPLETE** | 2026-10-25 | All exit criteria verified live (compose, health, migrations, RLS); CI push pending |
-| 1 — Identity, access, audit | 🔄 **code-complete, sign-off blocked** | unit tests 2026-10-27 | All deliverables built; 9 testcontainer tests blocked on Docker (not installed on this machine) |
-| 2 — People and academic structure | not started | — | |
+| 1 — Identity, access, audit | ✅ **COMPLETE** | 2026-10-27 | All exit criteria verified live: full suite 68 passed (incl. 10 testcontainer tests), ruff/mypy clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
+| 2 — People and academic structure | ✅ **COMPLETE** | 2026-11-02 | All exit criteria verified live: full suite **83 passed** (incl. 25 testcontainer tests), ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 3 — Assessment templates and score entry | not started | — | |
 | 4 — Calculation engine and processing | not started | — | |
 | 5 — Workflow, locking, publication, documents | not started | — | |
@@ -46,10 +48,57 @@ sit in [`09-phase-acceptance.md`](09-phase-acceptance.md) as PENDING.
 
 **Result: Partial — local gates green, Docker-dependent gates pending.**
 
-## Phase 1 status — 2026-10-27
+## Phase 2 status — COMPLETE 2026-11-02
 
-All Phase 1 deliverables are code-complete. Exit criteria are gated on 9 testcontainer
-tests that require Docker Desktop (not installed on this machine).
+All Phase 2 deliverables are built and all exit criteria verified live (full suite **83 passed**,
+including 25 testcontainer tests). Sign-off detail and the 2026-11-02 gate repair are in
+[`09-phase-acceptance.md`](09-phase-acceptance.md).
+
+### Deliverables
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| students, guardians, student_guardians | ✅ Built | `people/models.py`; migration `0003` |
+| Duplicate detection (409 POSSIBLE_DUPLICATE + confirm bypass) | ✅ Built | `people/service.py` (`BLOCK_SIMILARITY` 0.85 / report 0.6), `POST /students/check-duplicates` |
+| academic_sessions, terms, levels, classes, sections, subjects, class_subjects | ✅ Built | `academic/models.py`, `academic/router.py` |
+| enrolments, subject_enrolments | ✅ Built | Models + `POST /enrolments`; subject enrolments managed via enrolment/promotion services |
+| teacher_assignments | ✅ Built | `GET/POST /teacher-assignments` |
+| promotions (`POST /promotions/run`, per-student decisions) | ✅ Built | `academic/service.py::run_promotion` |
+| Nigerian default seed (Nursery, Primary 1–6, JSS 1–3, SS 1–3) | ✅ Seeded on `upgrade head` | Migration `0003` level/class seed loops |
+
+### Exit criteria
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| Student archive preserves history | ✅ Verified live | `tests/db/test_people.py::test_archive_preserves_history` |
+| Promotion keeps old results context | ✅ Verified live | `tests/db/test_academic.py` promotion invariant (old enrolment row + stamps + subject_enrolments kept) |
+| Scoped student lists respect teacher assignments | ✅ Verified live | `test_scoped_list_respects_teacher_assignments` + `test_assignment_section_narrowing`; `GET /students` uses `require_with_scope("students.view")` |
+| Migrations apply on clean DB | ✅ Verified every run | testcontainer fixture applies `alembic upgrade head` to a fresh Postgres per session |
+
+**Measured gates, 2026-11-02 (final)** (run from `apps/api` with `.venv`):
+`ruff check` clean · `ruff format --check` clean (79 files) · `mypy src/app tests migrations` →
+Success (79 files) · `lint-imports` 4/4 KEPT · `pytest tests` → **83 passed** (exit 0), incl. 25
+testcontainer-gated tests.
+
+### Phase 2 deviation (2026-10-30 → 2026-11-02)
+
+Commit `981717c` ("Remove legacy identity router and phase 2 academic tests") emptied
+`identity/router.py` (the entire Phase 1 auth surface) and `tests/db/test_academic.py` (the
+promotion-invariant tests) to zero bytes without a replacement or an ADR, leaving `main.py`
+importing the emptied module — the app could not start and no API-level test could collect.
+Repaired 2026-11-02 by restoring both files from the parent commit (`3f4b0f6`), fixing the
+latent defects the restored test carried (F821 `decider`, stale 3-tuple annotation, mojibake +
+BOM), adding the documented `app.people.service -> app.people.repository` self-import ignore to
+`contracts.ini`, and silencing S608/E501 in migration `0003` (seed literals; SQL byte-identical).
+The Phase 2 RLS seed helper also gained the missing `schools` row insert (FK violation against a
+fabricated `uuid4()` school id). No commits were made in-session; the repair sits uncommitted in
+the working tree for the owner to commit.
+
+## Phase 1 status — COMPLETE 2026-10-27
+
+All Phase 1 deliverables are built and all exit criteria verified live (Docker Desktop now
+installed; full suite **68 passed** including the 10 testcontainer tests). Sign-off detail and
+the fixes the live run required are in [`09-phase-acceptance.md`](09-phase-acceptance.md).
 
 ### Deliverables
 
@@ -70,14 +119,14 @@ tests that require Docker Desktop (not installed on this machine).
 | Criterion | Status | Command / evidence |
 |---|---|---|
 | Authorization matrix tests | ✅ Unit pass | `pytest tests/unit/test_authorize.py -q` |
-| Last-SA protection (API) | ✅ Code done; test blocked | `test_last_sa_protection.py` — testcontainer needs Docker |
-| Last-SA protection (DB trigger) | ✅ Code done; test blocked | `test_super_admin_trigger.py` — testcontainer needs Docker |
-| Revoked session fails immediately | ✅ Implemented | `access/dependency.py` checks token_version against Redis cache (30 s TTL) |
-| Audit chain verifier | ✅ Unit pass | `pytest tests/unit/test_audit_chain.py -q` |
+| Last-SA protection (API) | ✅ Verified live | `test_last_sa_protection.py` — 3 passed |
+| Last-SA protection (DB trigger) | ✅ Verified live | `test_super_admin_trigger.py` — 5 passed |
+| Revoked session fails immediately | ✅ Implemented + verified | `access/dependency.py` checks token_version against Redis cache (30 s TTL); bump verified live |
+| Audit chain verifier | ✅ Pass | `pytest tests/unit/test_audit_chain.py -q` |
 
-**Measured gates, 2026-10-27** (run from `apps/api` with `.venv`):
-`ruff check` clean · `ruff format --check` clean · `mypy src/app tests migrations -q` → Success ·
-`pytest tests/unit tests/api -q` → 45 passed · 9 ERRORS (Docker blocked).
+**Measured gates, 2026-10-27 (final, Docker installed)** (run from `apps/api` with `.venv`):
+`ruff check` clean · `ruff format --check` clean · `mypy src/app tests migrations` → Success (64 files) ·
+`pytest tests` → **68 passed** (incl. 10 testcontainer tests) in 17.71s.
 
 ### Phase 1 deviation (2026-10-27)
 

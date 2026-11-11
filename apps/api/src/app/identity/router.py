@@ -1,20 +1,20 @@
-"""Identity router — HTTP layer only (Phase 1).
+"""Identity router â€” HTTP layer only (Phase 1).
 
 Every route declares `require(...)` or `@public` (route-coverage guard).
 Business logic lives in `identity.service`; this module never touches
 repositories directly.
 """
-# ruff: noqa: B008  — Depends(require(...)) in defaults is the FastAPI idiom.
+# ruff: noqa: B008  â€” Depends(require(...)) in defaults is the FastAPI idiom.
 
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 
-from app.access.dependency import public, require
+from app.access.dependency import get_actor_db, public, require
 from app.access.service import Actor
 from app.identity import schemas
 from app.identity.service import IdentityService
-from app.platform.db import get_db, tenant_session
+from app.platform.db import tenant_session
 from app.platform.errors import ProblemError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -40,9 +40,9 @@ async def login(
     request: Request,
     body: schemas.LoginRequest,
 ) -> schemas.LoginResponse:
-    """Password login. Throttled per (email, IP) and per IP (spec §7.1)."""
+    """Password login. Throttled per (email, IP) and per IP (spec Â§7.1)."""
     ip = _client_ip(request)
-    # Seed School is the single tenant at launch (spec §5).
+    # Seed School is the single tenant at launch (spec Â§5).
     school_id = UUID("00000000-0000-7000-8000-000000000001")
     async with tenant_session(str(school_id)) as session:
         service = IdentityService(session)
@@ -75,9 +75,9 @@ async def refresh(body: schemas.RefreshRequest) -> schemas.RefreshResponse:
 @router.post("/logout")
 async def logout(
     actor: Actor = Depends(require("sessions.manage")),
-    session=Depends(get_db),
+    session=Depends(get_actor_db),
 ) -> dict[str, str]:
-    """Revoke the current session (spec §7.1)."""
+    """Revoke the current session (spec Â§7.1)."""
     from app.identity.repository import IdentityRepository
 
     repo = IdentityRepository(session)
@@ -93,7 +93,7 @@ async def logout(
 @router.get("/users/me/mfa/setup", response_model=schemas.MfaSetupResponse)
 async def mfa_setup(
     actor: Actor = Depends(require("users.edit")),
-    session=Depends(get_db),
+    session=Depends(get_actor_db),
 ) -> schemas.MfaSetupResponse:
     """Generate a new TOTP secret for the current user."""
     from app.identity.repository import IdentityRepository
@@ -110,7 +110,7 @@ async def mfa_setup(
 async def mfa_verify(
     body: schemas.MfaVerifyRequest,
     actor: Actor = Depends(require("users.edit")),
-    session=Depends(get_db),
+    session=Depends(get_actor_db),
 ) -> dict[str, bool]:
     """Verify a TOTP code."""
     from app.identity.repository import IdentityRepository
@@ -136,7 +136,7 @@ async def mfa_verify(
 )
 async def list_users(
     actor: Actor = Depends(require("users.view")),
-    session=Depends(get_db),
+    session=Depends(get_actor_db),
 ) -> list[schemas.UserListItem]:
     """List users scoped to the actor's school (RLS enforced)."""
     from sqlalchemy import select
@@ -159,7 +159,7 @@ async def list_users(
 async def create_user(
     body: schemas.UserCreate,
     actor: Actor = Depends(require("users.create")),
-    session=Depends(get_db),
+    session=Depends(get_actor_db),
 ) -> schemas.UserResponse:
     """Create a user. Cannot create a Super Admin without roles.manage."""
     service = IdentityService(session)
@@ -182,11 +182,11 @@ async def change_user_status(
     user_id: UUID,
     body: schemas.UserStatusUpdate,
     actor: Actor = Depends(require("users.edit")),
-    session=Depends(get_db),
+    session=Depends(get_actor_db),
 ) -> schemas.UserResponse:
     """Change a user's status (active/suspended/deactivated).
 
-    Deactivating the last active Super Admin returns 409 (spec §7.1 D9).
+    Deactivating the last active Super Admin returns 409 (spec Â§7.1 D9).
     """
     service = IdentityService(session)
     user = await service.set_user_status(user_id=user_id, new_status=body.status)

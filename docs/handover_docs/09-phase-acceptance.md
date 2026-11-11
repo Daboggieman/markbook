@@ -91,10 +91,34 @@ last-SA API ×3, RLS isolation ×2) · `ruff check` clean · `ruff format --chec
 
 | Criterion | Verified | Command + result |
 | --- | --- | --- |
-| Student archive | — | — |
-| Promotion preserves results | — | — |
-| Scoped student lists | — | — |
-| Clean-DB migrations | — | — |
+| Student archive | ✅ 2026-11-02 | `tests/db/test_people.py::test_archive_preserves_history` — pass (within full suite) |
+| Promotion preserves results | ✅ 2026-11-02 | `tests/db/test_academic.py` promotion invariant — old enrolment keeps row, stamps, subject_enrolments; new enrolment is a separate row in the new session |
+| Scoped student lists | ✅ 2026-11-02 | `test_scoped_list_respects_teacher_assignments` + `test_assignment_section_narrowing` — pass; route guarded by `require_with_scope("students.view")` |
+| Clean-DB migrations | ✅ 2026-11-02 | testcontainer fixture runs `alembic upgrade head` on a fresh Postgres every suite run — 83 collected, exit 0 |
+
+**Full-suite gates, 2026-11-02** (run from `apps/api` with `.venv`):
+`pytest tests` → **83 passed** (exit 0; 25 testcontainer-gated) · `ruff check` clean ·
+`ruff format --check` clean (79 files) · `mypy src/app tests migrations` → Success (79 files) ·
+`lint-imports --config contracts.ini` → 4 kept, 0 broken.
+
+**Gate repair, 2026-11-02 (deviation record):**
+- Commit `981717c` (2026-10-30) emptied `identity/router.py` and `tests/db/test_academic.py` to
+  zero bytes without replacement or ADR; `main.py:116` still imported the router → app
+  unimportable, test collection broken. Both files restored from parent `3f4b0f6`.
+- Restored test carried latent defects from `3f4b0f6`: F821 (`decider` renamed to `_decider` at
+  unpack but not at use), `_enrolled_student` annotated as a 3-tuple while returning 4 (8 mypy
+  errors), UTF-8 mojibake + BOM in docstrings. All fixed.
+- `contracts.ini` gained the self-import ignore `app.people.service -> app.people.repository`
+  (the documented per-module convention; academic's copy added when it first trips).
+- Migration `0003`: E501 wrap + 2× `# noqa: S608` (seed literals from fixed tuples — no
+  injection surface; executed SQL byte-identical, respecting rule 8).
+- `tests/security/test_phase2_rls.py`: seed helper inserted a student/enrolment for a
+  fabricated `uuid4()` school id with no `schools` row → FK violation. Helper now inserts the
+  school (`ON CONFLICT DO NOTHING`; no-op for the `two_schools` fixture callers).
+- pyproject mypy override `module = ["uuid7"]` → `["uuid_extensions"]` (the module the `uuid7`
+  distribution actually installs).
+
+**Result: Phase 2 exit criteria all verified 2026-11-02.**
 
 ---
 

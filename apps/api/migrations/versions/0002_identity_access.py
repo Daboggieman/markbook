@@ -32,6 +32,11 @@ depends_on: str | Sequence[str] | None = None
 
 
 def _upgrade() -> None:
+    # --- extensions -------------------------------------------------------
+    # citext backs users.email; without this the migration fails on any clean
+    # database (contrib extension, not enabled by default). Idempotent.
+    op.execute("CREATE EXTENSION IF NOT EXISTS citext")
+
     # --- enum types -------------------------------------------------------
     op.execute("CREATE TYPE userstatus AS ENUM ('active', 'suspended', 'deactivated')")
     op.execute("CREATE TYPE scopetype AS ENUM ('school', 'assigned', 'own')")

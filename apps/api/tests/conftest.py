@@ -48,31 +48,6 @@ def pg_url() -> Iterator[str]:
         if parsed.port:
             netloc += f":{parsed.port}"
         url = urlunparse((parsed.scheme, netloc, parsed.path, "", "", ""))
-
-        # Create extensions required by migrations before any fixture reads url.
-        import psycopg
-
-        def _as_libpq(conn_url: str) -> str:
-            """Convert a postgresql+psycopg:// URL to a libpq keyword string."""
-            from urllib.parse import urlparse
-
-            p = urlparse(conn_url)
-            kw = {
-                k: v
-                for k, v in [
-                    ("host", p.hostname),
-                    ("port", p.port or 5432),
-                    ("dbname", p.path.lstrip("/") or "postgres"),
-                    ("user", p.username),
-                    ("password", p.password),
-                ]
-                if v
-            }
-            return " ".join(f"{k}={v}" for k, v in kw.items())
-
-        with psycopg.connect(_as_libpq(url)) as conn:
-            conn.execute("CREATE EXTENSION IF NOT EXISTS citext")
-            conn.commit()
         yield url
 
 
@@ -97,8 +72,13 @@ async def two_schools(migrated_url: str) -> AsyncIterator[tuple[UUID, UUID]]:
     """Two schools in the migrated baseline DB, for RLS isolation tests."""
     engine = create_async_engine(migrated_url)
     async with engine.begin() as conn:
+        # ON CONFLICT: any test file may request this fixture; a second call
+        # in the same session must not collide with the first.
         await conn.execute(
-            text("INSERT INTO schools (id, name) VALUES (:id, :name), (:id2, :name2)").bindparams(
+            text(
+                "INSERT INTO schools (id, name) VALUES (:id, :name), (:id2, :name2) "
+                "ON CONFLICT (id) DO NOTHING"
+            ).bindparams(
                 id=SEED_SCHOOL_A,
                 name="School A",
                 id2=SEED_SCHOOL_B,

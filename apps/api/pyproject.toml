@@ -70,6 +70,12 @@ module = ["app.grading.*", "app.access.*"]
 disallow_untyped_defs = true
 warn_return_any = true
 
+[[tool.mypy.overrides]]
+# uuid_extensions (installed by the uuid7 distribution) ships without stubs; the
+# import is confined to people.models.uuid7().
+module = ["uuid_extensions"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

@@ -111,10 +111,14 @@ def create_app() -> FastAPI:
             **db_status,
         }
 
-    # Import and include routers here. Phase 1 adds identity and access routers.
+    # Import and include routers here. Phase 2 adds people and academic.
+    from app.academic.router import router as academic_router
     from app.identity.router import router as identity_router
+    from app.people.router import router as people_router
 
     app.include_router(identity_router, prefix="/api/v1", tags=["identity"])
+    app.include_router(people_router, prefix="/api/v1")
+    app.include_router(academic_router, prefix="/api/v1")
 
     return app
 
