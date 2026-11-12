@@ -30,11 +30,14 @@ async def shutdown(ctx: dict[str, Any]) -> None:
 # Job functions are registered here as they are added (Phase 2+).
 # Each job is idempotent and re-runnable (spec §12).
 from app.assessment.jobs import import_scores  # noqa: E402  — registered below
+from app.documents.jobs import report_cards, transcripts  # noqa: E402  — registered below
 from app.grading.jobs import process_results  # noqa: E402  — registered below
 
 JOB_FUNCTIONS: list[Callable[..., Any]] = [
     import_scores,
     process_results,
+    report_cards,
+    transcripts,
 ]
 
 # Periodic jobs are added when the first one ships (the nightly audit chain

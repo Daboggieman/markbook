@@ -2,7 +2,7 @@
 
 API side: request validation + a durable jobs row (202 pattern — rendering
 is never inline, ADR 005). Worker side: `generate_report_cards` /
-`generate_transcripts` render from the CURRENT processed results, store the
+`generate_transcript` render from the CURRENT processed results, store the
 PDF, and write the immutable published_documents row.
 
 Immutability and correction versioning (spec §10 — the exit criterion):
@@ -11,19 +11,22 @@ is idempotent (checksum match → no new row); a CORRECTION always creates the
 next version with `supersedes_id` → previous row and `correction_reason`
 stamped from the transition. Nothing ever UPDATEs or DELETEs a row.
 
-Cross-module edges (all legal): grading.service (results), assessment
-models + academic models + people models (models-only reads, the Phase 2
-precedent), platform.models (Job/School).
+`enrolment_id` throughout is a subject_enrolments.id — the same FK the
+published_documents table carries (one document per student per subject).
+
+Cross-module edges (all legal): grading.service (results), assessment +
+academic + people models (models-only reads, the Phase 2 precedent),
+platform.models (Job/School).
 """
 
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, Callable
-from uuid import UUID, uuid4
+from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.access.service import Actor
 from app.academic.models import (
     AcademicSession,
     ClassSubject,
@@ -33,10 +36,12 @@ from app.academic.models import (
     SubjectEnrolment,
     Term,
 )
+from app.access.service import Actor
 from app.assessment.models import Assessment
 from app.audit.service import AuditService
 from app.documents.render import render_result_document_html
-from app.documents.storage import checksum_of, storage_key_for
+from app.documents.storage import checksum_of
+from app.grading.models import ProcessedResult, ResultProcessingRun
 from app.grading.service import GradingService
 from app.platform.errors import NOT_FOUND, VALIDATION_ERROR, ProblemError
 from app.platform.logging import get_logger
@@ -93,13 +98,8 @@ class DocumentService:
 
     async def create_transcript_job(self, school_id: UUID, enrolment_id: UUID, actor: Actor) -> Job:
         """Queue a transcript for one subject enrolment (202): every PUBLISHED
-        result the student has for that class+subject, one PDF."""
-        seid = await self._s.scalar(
-            select(SubjectEnrolment.id).where(
-                SubjectEnrolment.school_id == school_id, SubjectEnrolment.id == enrolment_id
-            )
-        )
-        if seid is None:
+        result the student has for that class+subject, term-ordered, one PDF."""
+        if await self._get_subject_enrolment(school_id, enrolment_id) is None:
             raise ProblemError(NOT_FOUND, "Subject enrolment not found", status=404)
         published = await self._published_results_for_enrolment(school_id, enrolment_id)
         if not published:
@@ -152,7 +152,7 @@ class DocumentService:
         run, rows = await GradingService(self._s).get_results(school_id, assessment_id)
         school_name, subject_name, term_name = await self._assessment_labels(assessment)
 
-        generated: list[UUID] = []
+        generated: list[str] = []
         skipped = 0
         for result_row, student_name in rows:
             html = render_result_document_html(
@@ -172,26 +172,14 @@ class DocumentService:
                 ],
             )
             pdf = renderer(html)
-            key = storage_key_for(
-                school_id=school_id,
-                assessment_id=assessment_id,
-                enrolment_id=result_row.subject_enrolment_id,
-                kind="report_card",
-                doc_version=0,  # placeholder — replaced below once version known
-            )
+            seid = result_row.subject_enrolment_id
             document = await self._version_and_store(
                 school_id=school_id,
                 kind="report_card",
                 assessment_id=assessment_id,
-                enrolment_id=result_row.subject_enrolment_id,
+                enrolment_id=seid,
                 pdf=pdf,
-                key_fn=lambda v: storage_key_for(
-                    school_id=school_id,
-                    assessment_id=assessment_id,
-                    enrolment_id=result_row.subject_enrolment_id,
-                    kind="report_card",
-                    doc_version=v,
-                ),
+                key_template=f"schools/{school_id}/report_card/{assessment_id}/{seid}/v{{version}}.pdf",
                 storage=storage,
                 published_by=actor.user_id,
                 correction_reason=correction_reason,
@@ -200,7 +188,7 @@ class DocumentService:
             if document is None:
                 skipped += 1
             else:
-                generated.append(document.id)
+                generated.append(str(document.id))
 
         await AuditService(self._s, actor).write(
             "documents.report_cards_generated",
@@ -217,7 +205,7 @@ class DocumentService:
             "assessment_id": str(assessment_id),
             "generated": len(generated),
             "skipped": skipped,
-            "document_ids": [str(d) for d in generated],
+            "document_ids": generated,
         }
 
     async def generate_transcript(
@@ -255,20 +243,11 @@ class DocumentService:
             assessment_id=None,
             enrolment_id=enrolment_id,
             pdf=pdf,
-            key_fn=lambda v: storage_key_for(
-                school_id=school_id,
-                assessment_id=UUID(int=0),  # unused — key built below instead
-                enrolment_id=enrolment_id,
-                kind="transcript",
-                doc_version=v,
-            ),
+            key_template=f"schools/{school_id}/transcript/{enrolment_id}/v{{version}}.pdf",
             storage=storage,
             published_by=actor.user_id,
             correction_reason=None,
             force_new=False,
-            key_override_fn=lambda v: (
-                f"schools/{school_id}/transcript/{enrolment_id}/v{v}.pdf"
-            ),
         )
         await AuditService(self._s, actor).write(
             "documents.transcript_generated",
@@ -276,17 +255,26 @@ class DocumentService:
             entity_id=job.id,
             after={
                 "enrolment_id": str(enrolment_id),
-                "document_id": str(document.id) if document else None,
+                "document_id": str(document.id) if document is not None else None,
             },
         )
         return {
             "enrolment_id": str(enrolment_id),
-            "generated": 1 if document else 0,
-            "skipped": 0 if document else 1,
-            "document_ids": [str(document.id)] if document else [],
+            "generated": 1 if document is not None else 0,
+            "skipped": 0 if document is not None else 1,
+            "document_ids": [str(document.id)] if document is not None else [],
         }
 
     # ---- internals -----------------------------------------------------------------
+
+    async def _get_subject_enrolment(
+        self, school_id: UUID, enrolment_id: UUID
+    ) -> SubjectEnrolment | None:
+        return await self._s.scalar(
+            select(SubjectEnrolment).where(
+                SubjectEnrolment.school_id == school_id, SubjectEnrolment.id == enrolment_id
+            )
+        )
 
     async def _version_and_store(
         self,
@@ -296,38 +284,27 @@ class DocumentService:
         assessment_id: UUID | None,
         enrolment_id: UUID,
         pdf: bytes,
-        key_fn: Callable[[int], str],
+        key_template: str,
         storage: Any,
         published_by: UUID | None,
         correction_reason: str | None,
         force_new: bool,
-        key_override_fn: Callable[[int], str] | None = None,
     ) -> PublishedDocument | None:
         """The immutability core. Finds the current version, decides whether
         this render is a no-op, else INSERTs the next version superseding it.
 
         - checksum matches the latest row and not force_new → None (skip).
         - otherwise version = latest + 1, supersedes_id = latest.id.
+
+        `key_template` carries a `{version}` placeholder — every version is a
+        distinct object, and a superseded object is never overwritten.
         """
-        latest = await self._s.scalar(
-            select(PublishedDocument)
-            .where(
-                PublishedDocument.school_id == school_id,
-                PublishedDocument.kind == kind,
-                PublishedDocument.enrolment_id == enrolment_id,
-                PublishedDocument.assessment_id == assessment_id
-                if assessment_id is not None
-                else PublishedDocument.assessment_id.is_(None),
-            )
-            .order_by(PublishedDocument.doc_version.desc())
-            .limit(1)
-        )
+        latest = await self._latest_document(school_id, kind, assessment_id, enrolment_id)
         checksum = checksum_of(pdf)
         if latest is not None and latest.checksum == checksum and not force_new:
             return None
         version = (latest.doc_version + 1) if latest is not None else 1
-        build_key = key_override_fn if key_override_fn is not None else key_fn
-        key = build_key(version)
+        key = key_template.format(version=version)
         stored_checksum = storage.put(key, pdf)
         document = PublishedDocument(
             school_id=school_id,
@@ -346,29 +323,102 @@ class DocumentService:
         await self._s.flush()
         return document
 
+    async def _latest_document(
+        self,
+        school_id: UUID,
+        kind: str,
+        assessment_id: UUID | None,
+        enrolment_id: UUID,
+    ) -> PublishedDocument | None:
+        stmt = select(PublishedDocument).where(
+            PublishedDocument.school_id == school_id,
+            PublishedDocument.kind == kind,
+            PublishedDocument.enrolment_id == enrolment_id,
+        )
+        stmt = stmt.where(
+            PublishedDocument.assessment_id == assessment_id
+            if assessment_id is not None
+            else PublishedDocument.assessment_id.is_(None)
+        )
+        stmt = stmt.order_by(PublishedDocument.doc_version.desc()).limit(1)
+        return await self._s.scalar(stmt)
+
     async def _published_results_for_enrolment(
         self, school_id: UUID, enrolment_id: UUID
     ) -> list[dict[str, Any]]:
-        """Every PUBLISHED result for one student+subject, term-ordered.
+        """Every PUBLISHED result for one subject enrolment, term-ordered.
 
-        subject_enrolments of THIS enrolment → their assessments (published) →
-        the latest succeeded run's processed_result for that subject
-        enrolment. Returns render-ready row dicts.
+        A subject_enrolment is shared by every assessment of its class_subject
+        within the enrolment's session, so: published assessments for
+        (enrolment.class_id, class_subject.subject_id, session terms) → each
+        one's latest succeeded run → the processed_result for THIS seid.
         """
-        rows_raw = await self._s.execute(
-            select(
-                Assessment,
-                Term.name,
-                Term.ordinal,
-            )
-            .join(SubjectEnrolment, SubjectEnrolment.id == SubjectEnrolment.id)  # placeholder replaced below
-            .limit(0)
+        subject_enrolment = await self._get_subject_enrolment(school_id, enrolment_id)
+        if subject_enrolment is None:
+            raise ProblemError(NOT_FOUND, "Subject enrolment not found", status=404)
+        enrolment = await self._s.scalar(
+            select(Enrolment).where(Enrolment.id == subject_enrolment.enrolment_id)
         )
-        raise NotImplementedError
+        class_subject = await self._s.scalar(
+            select(ClassSubject).where(ClassSubject.id == subject_enrolment.class_subject_id)
+        )
+        if enrolment is None or class_subject is None:
+            raise ProblemError(NOT_FOUND, "Subject enrolment not found", status=404)
+
+        assessment_rows = (
+            await self._s.execute(
+                select(Assessment, Term.name, Term.ordinal)
+                .join(Term, Term.id == Assessment.term_id)
+                .where(
+                    Assessment.school_id == school_id,
+                    Assessment.class_id == enrolment.class_id,
+                    Assessment.subject_id == class_subject.subject_id,
+                    Assessment.workflow_state == "published",
+                    Term.session_id == enrolment.session_id,
+                )
+                .order_by(Term.ordinal)
+            )
+        ).all()
+
+        rows: list[dict[str, Any]] = []
+        for assessment, term_name, _ordinal in assessment_rows:
+            run_id = await self._s.scalar(
+                select(ResultProcessingRun.id)
+                .where(
+                    ResultProcessingRun.school_id == school_id,
+                    ResultProcessingRun.assessment_id == assessment.id,
+                    ResultProcessingRun.status == "succeeded",
+                )
+                .order_by(ResultProcessingRun.created_at.desc(), ResultProcessingRun.id)
+                .limit(1)
+            )
+            if run_id is None:
+                continue
+            result = await self._s.scalar(
+                select(ProcessedResult).where(
+                    ProcessedResult.school_id == school_id,
+                    ProcessedResult.run_id == run_id,
+                    ProcessedResult.subject_enrolment_id == enrolment_id,
+                )
+            )
+            if result is None:
+                continue
+            rows.append(
+                {
+                    "assessment_label": term_name,
+                    "total": result.total,
+                    "grade": result.grade,
+                    "position": result.position,
+                    "flags": list(result.flags),
+                }
+            )
+        return rows
 
     async def _assessment_labels(self, assessment: Assessment) -> tuple[str, str, str]:
         """(school_name, subject_name, term_name) for the render header."""
-        school_name = await self._s.scalar(select(School.name).where(School.id == assessment.school_id))
+        school_name = await self._s.scalar(
+            select(School.name).where(School.id == assessment.school_id)
+        )
         subject_name = await self._s.scalar(
             select(Subject.name).where(Subject.id == assessment.subject_id)
         )
@@ -377,20 +427,20 @@ class DocumentService:
 
     async def _enrolment_labels(self, school_id: UUID, enrolment_id: UUID) -> dict[str, str]:
         """Names for a transcript header: student, subject, session, school."""
-        subject_enrolment = await self._s.scalar(
-            select(SubjectEnrolment).where(
-                SubjectEnrolment.school_id == school_id, SubjectEnrolment.id == enrolment_id
-            )
-        )
+        subject_enrolment = await self._get_subject_enrolment(school_id, enrolment_id)
         if subject_enrolment is None:
             raise ProblemError(NOT_FOUND, "Subject enrolment not found", status=404)
         enrolment = await self._s.scalar(
             select(Enrolment).where(Enrolment.id == subject_enrolment.enrolment_id)
         )
-        student = await self._s.scalar(select(Student).where(Student.id == enrolment.student_id))
         class_subject = await self._s.scalar(
             select(ClassSubject).where(ClassSubject.id == subject_enrolment.class_subject_id)
         )
+        if enrolment is None or class_subject is None:
+            raise ProblemError(NOT_FOUND, "Subject enrolment not found", status=404)
+        student = await self._s.scalar(select(Student).where(Student.id == enrolment.student_id))
+        if student is None:
+            raise ProblemError(NOT_FOUND, "Student not found", status=404)
         subject_name = await self._s.scalar(
             select(Subject.name).where(Subject.id == class_subject.subject_id)
         )

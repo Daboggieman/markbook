@@ -86,9 +86,7 @@ class WorkflowRepository:
 
     # ---- workflow definitions --------------------------------------------------
 
-    async def get_definition(
-        self, school_id: uuid.UUID, name: str
-    ) -> WorkflowDefinition | None:
+    async def get_definition(self, school_id: uuid.UUID, name: str) -> WorkflowDefinition | None:
         result = await self._s.execute(
             select(WorkflowDefinition).where(
                 WorkflowDefinition.school_id == school_id,
@@ -118,8 +116,6 @@ class WorkflowRepository:
         school here, ON when the key is absent (spec §10)."""
         from app.platform.models import School
 
-        result = await self._s.execute(
-            select(School.config).where(School.id == school_id)
-        )
+        result = await self._s.execute(select(School.config).where(School.id == school_id))
         config = result.scalar_one_or_none()
         return config or {}

@@ -32,6 +32,7 @@ from app.platform.errors import (
     CONFLICT,
     INVALID_CREDENTIALS,
     INVALID_REFRESH,
+    MFA_REQUIRED,
     NOT_FOUND,
     REFRESH_REUSED,
     SESSION_EXPIRED,
@@ -334,7 +335,6 @@ class IdentityService:
             if not await self.verify_mfa(user, totp_code):
                 raise ProblemError(INVALID_CREDENTIALS, "Invalid MFA code", status=401)
 
-        settings = get_settings()
         token, ttl = create_access_token(
             user_id=user.id,
             school_id=user.school_id,

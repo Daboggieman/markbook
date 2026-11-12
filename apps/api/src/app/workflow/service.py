@@ -269,7 +269,9 @@ class WorkflowService:
                 extra={"unresolved": sorted(unresolved)},
             )
 
-    async def _guard_not_submitter(self, school_id: UUID, assessment_id: UUID, actor: Actor) -> None:
+    async def _guard_not_submitter(
+        self, school_id: UUID, assessment_id: UUID, actor: Actor
+    ) -> None:
         """Hard rule (spec §10): the reviewer is not the submitter."""
         submitter = await self._submitter(school_id, assessment_id)
         if submitter is not None and submitter == actor.user_id:
@@ -341,8 +343,10 @@ class WorkflowService:
                     f"Unknown workflow state '{stage.state}' in stage definition",
                 )
         existing = await self._repo.get_definition(school_id, data.name)
-        definition = existing if existing is not None else WorkflowDefinition(
-            school_id=school_id, name=data.name, stages=[]
+        definition = (
+            existing
+            if existing is not None
+            else WorkflowDefinition(school_id=school_id, name=data.name, stages=[])
         )
         definition.stages = [s.model_dump() for s in data.stages]
         definition.created_by = actor.user_id

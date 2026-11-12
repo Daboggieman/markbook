@@ -112,18 +112,23 @@ def create_app() -> FastAPI:
         }
 
     # Import and include routers here. Phase 2 adds people and academic;
-    # Phase 3 adds assessment; Phase 4 adds grading.
+    # Phase 3 adds assessment; Phase 4 adds grading; Phase 5 adds workflow
+    # and documents.
     from app.academic.router import router as academic_router
     from app.assessment.router import router as assessment_router
+    from app.documents.router import router as documents_router
     from app.grading.router import router as grading_router
     from app.identity.router import router as identity_router
     from app.people.router import router as people_router
+    from app.workflow.router import router as workflow_router
 
     app.include_router(identity_router, prefix="/api/v1", tags=["identity"])
     app.include_router(people_router, prefix="/api/v1")
     app.include_router(academic_router, prefix="/api/v1")
     app.include_router(assessment_router, prefix="/api/v1")
     app.include_router(grading_router, prefix="/api/v1")
+    app.include_router(workflow_router, prefix="/api/v1")
+    app.include_router(documents_router, prefix="/api/v1")
 
     return app
 

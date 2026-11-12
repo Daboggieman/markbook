@@ -51,7 +51,8 @@ def render_result_document_html(
     title = "Report Card" if kind == "report_card" else "Transcript"
     body_rows = "\n".join(
         f"<tr><td>{r['assessment_label']}</td><td>{_fmt(r['total'])}</td>"
-        f"<td>{r['grade'] or '—'}</td><td>{r['position'] if r['position'] is not None else '—'}</td>"
+        f"<td>{r['grade'] or '—'}</td>"
+        f"<td>{r['position'] if r['position'] is not None else '—'}</td>"
         f"<td>{', '.join(r['flags']) or ''}</td></tr>"
         for r in rows
     )

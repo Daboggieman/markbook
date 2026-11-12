@@ -49,9 +49,7 @@ def upgrade() -> None:
         )
         """
     )
-    op.execute(
-        "CREATE INDEX ix_workflow_definitions_school_id ON workflow_definitions (school_id)"
-    )
+    op.execute("CREATE INDEX ix_workflow_definitions_school_id ON workflow_definitions (school_id)")
 
     # --- approval_records ---------------------------------------------------
     # One row per successful transition — the durable "who approved what"
@@ -71,9 +69,7 @@ def upgrade() -> None:
         )
         """
     )
-    op.execute(
-        "CREATE INDEX ix_approval_records_school_id ON approval_records (school_id)"
-    )
+    op.execute("CREATE INDEX ix_approval_records_school_id ON approval_records (school_id)")
     op.execute(
         "CREATE INDEX ix_approval_records_school_assessment "
         "ON approval_records (school_id, assessment_id)"
@@ -103,13 +99,12 @@ def upgrade() -> None:
             CONSTRAINT uq_published_documents_version
                 -- NULLS NOT DISTINCT: a plain UNIQUE treats NULLs as distinct,
                 -- which would let two transcript v1 rows coexist (PG 15+).
-                UNIQUE NULLS NOT DISTINCT (school_id, assessment_id, enrolment_id, kind, doc_version)
+                UNIQUE NULLS NOT DISTINCT
+                    (school_id, assessment_id, enrolment_id, kind, doc_version)
         )
         """
     )
-    op.execute(
-        "CREATE INDEX ix_published_documents_school_id ON published_documents (school_id)"
-    )
+    op.execute("CREATE INDEX ix_published_documents_school_id ON published_documents (school_id)")
     op.execute(
         "CREATE INDEX ix_published_documents_school_assessment "
         "ON published_documents (school_id, assessment_id)"

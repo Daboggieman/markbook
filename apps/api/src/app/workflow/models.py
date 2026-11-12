@@ -85,9 +85,7 @@ class ApprovalRecord(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
 class PublishedDocument(Base):
