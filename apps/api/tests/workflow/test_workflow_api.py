@@ -290,6 +290,22 @@ async def _seed_world(maker: async_sessionmaker) -> World:
                 )
                 for n in STUDENTS
             ]
+            + [
+                # The teacher's assignment is what the `assigned` scope checks.
+                (
+                    "INSERT INTO teacher_assignments (id, school_id, teacher_user_id, "
+                    "session_id, class_id, section_id, subject_id, role) "
+                    "VALUES (:id, :s, :t, :a, :c, NULL, :sub, 'subject')",
+                    {
+                        "id": uuid4(),
+                        "s": w.school_id,
+                        "t": w.uid("teacher"),
+                        "a": w.session_id,
+                        "c": w.class_id,
+                        "sub": w.subject_id,
+                    },
+                )
+            ]
         ):
             await s.execute(text(stmt), params)
         await s.commit()
@@ -459,6 +475,19 @@ async def _get_mfa_secret(w: World, who: str) -> str:
     secret = await _scalar(w, "SELECT mfa_secret FROM users WHERE id = :u", {"u": w.uid(who)})
     assert secret, f"{who} has no MFA secret seeded"
     return str(secret)
+
+
+async def _stepup_pair(w: World) -> dict[str, str]:
+    """Tokens that pass the lock and publish step-up gates — the re-auth
+    dependency on those routes answers 401 before the state check, so
+    illegal-transition probes for them need these. The lock token is minted
+    BEFORE MFA is enabled (a no-TOTP reauth is refused once it is)."""
+    lock_token = await _reauthed(w, "admin")
+    secret = await _enable_mfa(w, "admin")
+    return {
+        "lock": lock_token,
+        "publish": await _reauthed(w, "admin", totp=pyotp.TOTP(secret).now()),
+    }
 
 
 async def _reauthed(
@@ -671,11 +700,12 @@ class TestLifecycle:
 class TestIllegalTransitions:
     async def test_draft_rejects_everything_but_submit(self, world) -> None:
         w = world
+        stepup = await _stepup_pair(w)  # lock/publish gates answer 401 first
         for action in ("start-review", "return", "approve", "lock", "publish", "correct"):
             r = await w.client.post(
                 f"/api/v1/assessments/{w.assessment_id}/{action}",
                 json={},
-                headers=w.auth(w.token("admin")),
+                headers=w.auth(stepup.get(action, w.token("admin"))),
             )
             assert r.status_code == 409, f"{action}: {r.status_code} {r.text}"
             assert r.json()["code"] == "INVALID_STATE_TRANSITION"
@@ -683,25 +713,27 @@ class TestIllegalTransitions:
     async def test_submitted_rejects_submit_approve_lock_publish_correct(self, world) -> None:
         w = world
         await _drive_to(w, "submitted")
+        stepup = await _stepup_pair(w)
         for action in ("submit", "approve", "lock", "publish", "correct"):
             r = await w.client.post(
                 f"/api/v1/assessments/{w.assessment_id}/{action}",
                 json={},
-                headers=w.auth(w.token("admin")),
+                headers=w.auth(stepup.get(action, w.token("admin"))),
             )
-            assert r.status_code == 409, f"{action}: {r.status_code}"
+            assert r.status_code == 409, f"{action}: {r.status_code} {r.text}"
+            assert r.json()["code"] == "INVALID_STATE_TRANSITION"
 
     async def test_approved_rejects_submit_and_publish(self, world) -> None:
         w = world
         await _drive_to(w, "approved")
+        stepup = await _stepup_pair(w)
         for action in ("submit", "start-review", "publish"):
-            assert (
-                await w.client.post(
-                    f"/api/v1/assessments/{w.assessment_id}/{action}",
-                    json={},
-                    headers=w.auth(w.token("admin")),
-                )
-            ).status_code == 409
+            r = await w.client.post(
+                f"/api/v1/assessments/{w.assessment_id}/{action}",
+                json={},
+                headers=w.auth(stepup.get(action, w.token("admin"))),
+            )
+            assert r.status_code == 409, f"{action}: {r.status_code} {r.text}"
 
     async def test_locked_rejects_lock_approve_correct(self, world) -> None:
         w = world
@@ -774,12 +806,14 @@ class TestGuards:
         assert r.status_code == 409, r.text  # SUBMITTED is not editable
         await _post_transition(w, "start-review", w.token("registrar"))
         await _post_transition(w, "return", w.token("registrar"), reason="fix CA1")
-        r = await w.client.put(
-            f"/api/v1/assessments/{w.assessment_id}/scores",
-            json={"rows": [_cell(w.se_ids["ada"], "CA1", "entered", "9.00")]},
-            headers=w.auth(w.token("admin")),
+        await _enter_scores(w)  # RETURNED is editable again (base_version handled)
+        sheet = await w.client.get(
+            f"/api/v1/assessments/{w.assessment_id}/sheet", headers=w.auth(w.token("admin"))
         )
-        assert r.status_code == 200, r.text  # RETURNED is editable again
+        ada = next(
+            row for row in sheet.json()["rows"] if row["subject_enrolment_id"] == str(w.se_ids["ada"])
+        )
+        assert float(ada["scores"]["CA1"]["value"]) == 9.0  # the edit landed
 
     async def test_approve_requires_a_current_successful_run(self, world) -> None:
         w = world
@@ -865,9 +899,11 @@ class TestStepUp:
         )
         assert r.status_code == 401
         assert r.json()["code"] == "INVALID_CREDENTIALS"
-        # The right password mints a same-session token carrying reauth_at.
+        # The right password mints a same-session token carrying reauth_at —
+        # which satisfies the lock gate on an assessment actually in approved.
+        await _drive_to(w, "approved")
         token = await _reauthed(w, "admin")
-        await _post_transition(w, "lock", token)  # — which satisfies the lock gate
+        await _post_transition(w, "lock", token)
 
     async def test_publish_demands_mfa_on_the_reauth(self, world) -> None:
         w = world
@@ -911,7 +947,7 @@ class TestDocuments:
             json={"assessment_id": str(w.assessment_id)},
             headers=w.auth(w.token("registrar")),
         )
-        assert r.status_code == 409, r.text  # draft → not printable
+        assert r.status_code == 422, r.text  # draft → not printable (validation error)
 
     async def test_generation_writes_immutable_v1_rows_and_is_idempotent(
         self, world, monkeypatch
@@ -979,7 +1015,7 @@ class TestDocuments:
         # v1 rows untouched — INSERT-only, never updated.
         v1_after = await _rows(
             w,
-            "SELECT id, checksum FROM published_documents "
+            "SELECT id, enrolment_id, checksum FROM published_documents "
             "WHERE school_id = :s AND doc_version = 1 ORDER BY enrolment_id",
             {"s": w.school_id},
         )
@@ -1026,7 +1062,7 @@ class TestDocuments:
             json={"enrolment_id": str(seid)},
             headers=w.auth(w.token("registrar")),
         )
-        assert r.status_code == 409, r.text  # nothing published yet
+        assert r.status_code == 422, r.text  # nothing published yet (validation error)
 
         jobs = await _drive_to(w, "published")
         await _run_doc_worker(monkeypatch, w, jobs["report_cards"])
@@ -1074,10 +1110,11 @@ class TestDocuments:
         await _post_transition(w, "submit", w.token("admin"), assessment_id=aid2)
         await _post_transition(w, "start-review", w.token("registrar"), assessment_id=aid2)
         await _post_transition(w, "approve", w.token("registrar"), assessment_id=aid2)
-        token = await _reauthed(w, "admin")
-        await _post_transition(w, "lock", token, assessment_id=aid2)
-        secret = await _enable_mfa(w, "admin")
+        # Admin's MFA was enabled for aid1's publish — every later reauth needs
+        # the TOTP code (an MFA-reauthed token also satisfies the plain gate).
+        secret = await _get_mfa_secret(w, "admin")
         token = await _reauthed(w, "admin", totp=pyotp.TOTP(secret).now())
+        await _post_transition(w, "lock", token, assessment_id=aid2)
         await _post_transition(w, "publish", token, assessment_id=aid2)
 
         seid = w.se_ids["ada"]
@@ -1204,7 +1241,9 @@ class TestDefinitionsAndScope:
                 await set_tenant_context(s, str(w.school_id))
                 await WorkflowService(s).save_definition(
                     w.school_id,
-                    WorkflowDefinitionCreate(name="Bad", stages=[StageDef(state="sideways")]),
+                    WorkflowDefinitionCreate(
+                        name="Bad", stages=[StageDef(state="sideways", requires="scores.enter")]
+                    ),
                     actor,
                 )
         assert excinfo.value.status == 422
