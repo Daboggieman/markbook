@@ -14,7 +14,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.workflow.schemas import StageDef, TransitionRequest, WorkflowDefinitionCreate
-from app.workflow.service import SCOPED_TRANSITION_PERMISSIONS, TRANSITIONS, Transition
+from app.workflow.service import SCOPED_TRANSITION_PERMISSIONS, TRANSITIONS
 
 # Spec §10 table, verbatim: (from_state, action) → (to_state, permission).
 SPEC_TABLE = {
@@ -67,11 +67,14 @@ class TestTransitionTable:
 
     def test_results_permissions_are_school_scope_only(self) -> None:
         """Only the scores.* transition permissions honour the assigned scope
-        (spec §10 marks exactly those two "(scoped)")."""
+        (spec §10 marks exactly those two "(scoped)"); every results.*
+        permission is school-scope only."""
         assert SCOPED_TRANSITION_PERMISSIONS == {"scores.submit", "scores.review"}
         for key, transition in TRANSITIONS.items():
-            if key[1] not in ("submit", "start-review"):
-                assert transition.permission not in SCOPED_TRANSITION_PERMISSIONS
+            if transition.permission.startswith("results."):
+                assert transition.permission not in SCOPED_TRANSITION_PERMISSIONS, key
+            else:
+                assert transition.permission in SCOPED_TRANSITION_PERMISSIONS, key
 
     def test_transitions_are_frozen(self) -> None:
         with pytest.raises(dataclasses.FrozenInstanceError):

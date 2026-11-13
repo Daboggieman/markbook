@@ -46,7 +46,13 @@ PASSWORD = "Correct-Horse-9"
 TEMPLATE = {
     "components": [
         {"key": "CA1", "label": "First CA", "max_score": "10.00", "weight": "10", "required": True},
-        {"key": "CA2", "label": "Second CA", "max_score": "10.00", "weight": "10", "required": True},
+        {
+            "key": "CA2",
+            "label": "Second CA",
+            "max_score": "10.00",
+            "weight": "10",
+            "required": True,
+        },
         {"key": "Test", "label": "Test", "max_score": "20.00", "weight": "20", "required": True},
         {"key": "Exam", "label": "Exam", "max_score": "60.00", "weight": "60", "required": True},
     ]
@@ -72,20 +78,50 @@ SCHEME = {
 # Three students, everything entered — the submit guard passes on these.
 STUDENTS = ("ada", "bayo", "chidi")
 SCORES = {
-    "ada": [("CA1", "entered", "8.00"), ("CA2", "entered", "7.00"), ("Test", "entered", "15.00"), ("Exam", "entered", "48.00")],
-    "bayo": [("CA1", "entered", "6.00"), ("CA2", "entered", "5.00"), ("Test", "entered", "12.00"), ("Exam", "entered", "40.00")],
-    "chidi": [("CA1", "entered", "5.00"), ("CA2", "entered", "4.50"), ("Test", "entered", "9.00"), ("Exam", "entered", "31.00")],
+    "ada": [
+        ("CA1", "entered", "8.00"),
+        ("CA2", "entered", "7.00"),
+        ("Test", "entered", "15.00"),
+        ("Exam", "entered", "48.00"),
+    ],
+    "bayo": [
+        ("CA1", "entered", "6.00"),
+        ("CA2", "entered", "5.00"),
+        ("Test", "entered", "12.00"),
+        ("Exam", "entered", "40.00"),
+    ],
+    "chidi": [
+        ("CA1", "entered", "5.00"),
+        ("CA2", "entered", "4.50"),
+        ("Test", "entered", "9.00"),
+        ("Exam", "entered", "31.00"),
+    ],
 }
 
 ADMIN_PERMS = (
-    "assessments.view", "assessments.manage", "scores.enter", "scores.view",
-    "scores.submit", "scores.review", "results.process", "results.approve",
-    "results.lock", "results.publish", "results.correct", "reports.view",
+    "assessments.view",
+    "assessments.manage",
+    "scores.enter",
+    "scores.view",
+    "scores.submit",
+    "scores.review",
+    "results.process",
+    "results.approve",
+    "results.lock",
+    "results.publish",
+    "results.correct",
+    "reports.view",
     "transcripts.generate",
 )
 REGISTRAR_PERMS = (
-    "assessments.view", "scores.view", "scores.review", "results.approve",
-    "results.lock", "results.publish", "results.correct", "reports.view",
+    "assessments.view",
+    "scores.view",
+    "scores.review",
+    "results.approve",
+    "results.lock",
+    "results.publish",
+    "results.correct",
+    "reports.view",
     "transcripts.generate",
 )
 TEACHER_PERMS = ("assessments.view", "scores.enter", "scores.view", "scores.submit")
@@ -120,11 +156,12 @@ class World:
 
 
 async def _seed_world(maker: async_sessionmaker) -> World:
-    w = World()
+    w = World(maker=maker)
     user_ids = {who: uuid4() for who in ("admin", "registrar", "teacher", "viewer")}
     w.users = {who: (uid, "") for who, uid in user_ids.items()}
     ids = {name: uuid4() for name in STUDENTS}
     enrols = {name: uuid4() for name in STUDENTS}
+    w.se_ids = {name: uuid4() for name in STUDENTS}
     role_ids = {name: uuid4() for name in ("Admin", "Registrar", "Teacher", "Viewer")}
     role_perms = {
         "Admin": ADMIN_PERMS,
@@ -152,7 +189,10 @@ async def _seed_world(maker: async_sessionmaker) -> World:
             for who, uid in user_ids.items()
         ],
         *[
-            ("INSERT INTO roles (id, school_id, name) VALUES (:id, :s, :n)", {"id": rid, "s": w.school_id, "n": name})
+            (
+                "INSERT INTO roles (id, school_id, name) VALUES (:id, :s, :n)",
+                {"id": rid, "s": w.school_id, "n": name},
+            )
             for name, rid in role_ids.items()
         ],
         *[
@@ -173,7 +213,8 @@ async def _seed_world(maker: async_sessionmaker) -> World:
             for role, rid in role_ids.items()
         ],
         (
-            "INSERT INTO educational_levels (id, school_id, name, ordinal) VALUES (:id, :s, 'JSS', 2)",
+            "INSERT INTO educational_levels (id, school_id, name, ordinal) "
+            "VALUES (:id, :s, 'JSS', 2)",
             {"id": uuid4(), "s": w.school_id},
         ),
         (
@@ -186,15 +227,18 @@ async def _seed_world(maker: async_sessionmaker) -> World:
             {"id": w.subject_id, "s": w.school_id},
         ),
         (
-            "INSERT INTO class_subjects (id, school_id, class_id, subject_id) VALUES (:id, :s, :c, :sub)",
+            "INSERT INTO class_subjects (id, school_id, class_id, subject_id) "
+            "VALUES (:id, :s, :c, :sub)",
             {"id": w.class_subject_id, "s": w.school_id, "c": w.class_id, "sub": w.subject_id},
         ),
         (
-            "INSERT INTO academic_sessions (id, school_id, name, is_current) VALUES (:id, :s, '2025/2026', true)",
+            "INSERT INTO academic_sessions (id, school_id, name, is_current) "
+            "VALUES (:id, :s, '2025/2026', true)",
             {"id": w.session_id, "s": w.school_id},
         ),
         (
-            "INSERT INTO terms (id, school_id, session_id, name, ordinal) VALUES (:id, :s, :a, 'First Term', 1)",
+            "INSERT INTO terms (id, school_id, session_id, name, ordinal) "
+            "VALUES (:id, :s, :a, 'First Term', 1)",
             {"id": w.term_id, "s": w.school_id, "a": w.session_id},
         ),
         (
@@ -202,7 +246,8 @@ async def _seed_world(maker: async_sessionmaker) -> World:
             {"id": w.template_id, "s": w.school_id},
         ),
         (
-            "INSERT INTO assessment_template_versions (id, school_id, template_id, version_no, status, definition) "
+            "INSERT INTO assessment_template_versions "
+            "(id, school_id, template_id, version_no, status, definition) "
             "VALUES (:id, :s, :t, 1, 'active', :def)",
             {"id": w.version_id, "s": w.school_id, "t": w.template_id, "def": json.dumps(TEMPLATE)},
         ),
@@ -211,26 +256,45 @@ async def _seed_world(maker: async_sessionmaker) -> World:
     async with maker() as s:
         for stmt, params in stmts:
             await s.execute(text(stmt), params)
-        for stmt, params in [
-            ("INSERT INTO students (id, school_id, first_name, last_name, admission_no, status) "
-             "VALUES (:id, :s, :fn, 'Test', :adm, 'active')",
-             {"id": ids[n], "s": w.school_id, "fn": n.capitalize(), "adm": f"ADM-{i}"})
-            for i, n in enumerate(STUDENTS, start=1)
-        ] + [
-            ("INSERT INTO enrolments (id, school_id, student_id, session_id, class_id, status) "
-             "VALUES (:id, :s, :st, :a, :c, 'enrolled')",
-             {"id": enrols[n], "s": w.school_id, "st": ids[n], "a": w.session_id, "c": w.class_id})
-            for n in STUDENTS
-        ] + [
-            ("INSERT INTO subject_enrolments (id, school_id, enrolment_id, class_subject_id) "
-             "VALUES (:id, :s, :e, :cs)",
-             {"id": w.se_ids[n], "s": w.school_id, "e": enrols[n], "cs": w.class_subject_id})
-            for n in STUDENTS
-        ]:
+        for stmt, params in (
+            [
+                (
+                    "INSERT INTO students (id, school_id, first_name, last_name, "
+                    "admission_no, status) "
+                    "VALUES (:id, :s, :fn, 'Test', :adm, 'active')",
+                    {"id": ids[n], "s": w.school_id, "fn": n.capitalize(), "adm": f"ADM-{i}"},
+                )
+                for i, n in enumerate(STUDENTS, start=1)
+            ]
+            + [
+                (
+                    "INSERT INTO enrolments (id, school_id, student_id, session_id, "
+                    "class_id, status) "
+                    "VALUES (:id, :s, :st, :a, :c, 'enrolled')",
+                    {
+                        "id": enrols[n],
+                        "s": w.school_id,
+                        "st": ids[n],
+                        "a": w.session_id,
+                        "c": w.class_id,
+                    },
+                )
+                for n in STUDENTS
+            ]
+            + [
+                (
+                    "INSERT INTO subject_enrolments (id, school_id, enrolment_id, "
+                    "class_subject_id) "
+                    "VALUES (:id, :s, :e, :cs)",
+                    {"id": w.se_ids[n], "s": w.school_id, "e": enrols[n], "cs": w.class_subject_id},
+                )
+                for n in STUDENTS
+            ]
+        ):
             await s.execute(text(stmt), params)
         await s.commit()
 
-    await _add_assessment(w, w.term_id)
+    w.assessment_id = await _add_assessment(w, w.term_id)
 
     for who, uid in user_ids.items():
         token, _ = create_access_token(
@@ -249,8 +313,14 @@ async def _add_assessment(w: World, term_id: UUID) -> UUID:
                 "subject_id, template_version_id, workflow_state) "
                 "VALUES (:id, :s, :t, :c, NULL, :sub, :v, 'draft')"
             ),
-            {"id": assessment, "s": w.school_id, "t": term_id, "c": w.class_id,
-             "sub": w.subject_id, "v": w.version_id},
+            {
+                "id": assessment,
+                "s": w.school_id,
+                "t": term_id,
+                "c": w.class_id,
+                "sub": w.subject_id,
+                "v": w.version_id,
+            },
         )
         await s.commit()
     return assessment
@@ -294,14 +364,35 @@ class FakeStorage:
 
 
 def _cell(se_id: UUID, key: str, status: str, value=None) -> dict:
-    return {"subject_enrolment_id": str(se_id), "component_key": key, "status": status, "value": value}
+    return {
+        "subject_enrolment_id": str(se_id),
+        "component_key": key,
+        "status": status,
+        "value": value,
+    }
 
 
 async def _enter_scores(w: World, assessment_id: UUID | None = None, *, only=None) -> None:
     assessment_id = assessment_id or w.assessment_id
+    # Existing cells carry a version — overwriting one (the return → edit
+    # cycle) requires its current version as base_version (Phase 3 contract).
+    r = await w.client.get(
+        f"/api/v1/assessments/{assessment_id}/sheet", headers=w.auth(w.token("admin"))
+    )
+    assert r.status_code == 200, r.text
+    versions = {
+        (str(row["subject_enrolment_id"]), key): cell["version"]
+        for row in r.json()["rows"]
+        for key, cell in row["scores"].items()
+    }
     rows = []
-    for name in (only or STUDENTS):
-        rows.extend(_cell(w.se_ids[name], key, status, value) for key, status, value in SCORES[name])
+    for name in only or STUDENTS:
+        for key, status, value in SCORES[name]:
+            cell = _cell(w.se_ids[name], key, status, value)
+            prior = versions.get((cell["subject_enrolment_id"], key))
+            if prior is not None:
+                cell["base_version"] = prior
+            rows.append(cell)
     r = await w.client.put(
         f"/api/v1/assessments/{assessment_id}/scores",
         json={"rows": rows},
@@ -364,7 +455,15 @@ async def _enable_mfa(w: World, who: str) -> str:
     return secret
 
 
-async def _reauthed(w: World, who: str, *, password: str = PASSWORD, totp: str | None = None) -> str:
+async def _get_mfa_secret(w: World, who: str) -> str:
+    secret = await _scalar(w, "SELECT mfa_secret FROM users WHERE id = :u", {"u": w.uid(who)})
+    assert secret, f"{who} has no MFA secret seeded"
+    return str(secret)
+
+
+async def _reauthed(
+    w: World, who: str, *, password: str = PASSWORD, totp: str | None = None
+) -> str:
     body: dict = {"password": password}
     if totp:
         body["totp_code"] = totp
@@ -439,8 +538,11 @@ async def _new_doc_job(
                 "id": job_id,
                 "s": w.school_id,
                 "p": json.dumps(
-                    {"assessment_id": str(assessment_id), "correction": correction,
-                     "correction_reason": reason}
+                    {
+                        "assessment_id": str(assessment_id),
+                        "correction": correction,
+                        "correction_reason": reason,
+                    }
                 ),
             },
         )
@@ -492,12 +594,28 @@ class TestLifecycle:
         assert records[4][2] == w.uid("admin")  # publish actor
 
         # Every action audited.
-        actions = {r[0] for r in await _rows(w, "SELECT action FROM audit_events WHERE school_id = :s", {"s": w.school_id})}
-        assert {"workflow.submit", "workflow.start_review", "workflow.approve",
-                "workflow.lock", "workflow.publish", "documents.generation_requested"} <= actions
+        actions = {
+            r[0]
+            for r in await _rows(
+                w, "SELECT action FROM audit_events WHERE school_id = :s", {"s": w.school_id}
+            )
+        }
+        assert {
+            "workflow.submit",
+            "workflow.start_review",
+            "workflow.approve",
+            "workflow.lock",
+            "workflow.publish",
+            "documents.generation_requested",
+        } <= actions
 
         # Outbox events in the same transactions.
-        topics = {r[0] for r in await _rows(w, "SELECT topic FROM outbox_events WHERE school_id = :s", {"s": w.school_id})}
+        topics = {
+            r[0]
+            for r in await _rows(
+                w, "SELECT topic FROM outbox_events WHERE school_id = :s", {"s": w.school_id}
+            )
+        }
         assert TOPIC_ASSESSMENT_STATE_CHANGED in topics
         assert TOPIC_RESULTS_PUBLISHED in topics
 
@@ -517,7 +635,8 @@ class TestLifecycle:
 
         records = await _rows(
             w,
-            "SELECT from_state, to_state, reason FROM approval_records WHERE assessment_id = :a ORDER BY at, id",
+            "SELECT from_state, to_state, reason FROM approval_records "
+            "WHERE assessment_id = :a ORDER BY at, id",
             {"a": w.assessment_id},
         )
         assert [(r[0], r[1]) for r in records] == [
@@ -554,7 +673,9 @@ class TestIllegalTransitions:
         w = world
         for action in ("start-review", "return", "approve", "lock", "publish", "correct"):
             r = await w.client.post(
-                f"/api/v1/assessments/{w.assessment_id}/{action}", json={}, headers=w.auth(w.token("admin"))
+                f"/api/v1/assessments/{w.assessment_id}/{action}",
+                json={},
+                headers=w.auth(w.token("admin")),
             )
             assert r.status_code == 409, f"{action}: {r.status_code} {r.text}"
             assert r.json()["code"] == "INVALID_STATE_TRANSITION"
@@ -564,7 +685,9 @@ class TestIllegalTransitions:
         await _drive_to(w, "submitted")
         for action in ("submit", "approve", "lock", "publish", "correct"):
             r = await w.client.post(
-                f"/api/v1/assessments/{w.assessment_id}/{action}", json={}, headers=w.auth(w.token("admin"))
+                f"/api/v1/assessments/{w.assessment_id}/{action}",
+                json={},
+                headers=w.auth(w.token("admin")),
             )
             assert r.status_code == 409, f"{action}: {r.status_code}"
 
@@ -572,29 +695,51 @@ class TestIllegalTransitions:
         w = world
         await _drive_to(w, "approved")
         for action in ("submit", "start-review", "publish"):
-            assert (await w.client.post(
-                f"/api/v1/assessments/{w.assessment_id}/{action}", json={}, headers=w.auth(w.token("admin"))
-            )).status_code == 409
+            assert (
+                await w.client.post(
+                    f"/api/v1/assessments/{w.assessment_id}/{action}",
+                    json={},
+                    headers=w.auth(w.token("admin")),
+                )
+            ).status_code == 409
 
     async def test_locked_rejects_lock_approve_correct(self, world) -> None:
         w = world
         await _drive_to(w, "locked")
-        for action in ("approve", "lock", "correct"):
-            assert (await w.client.post(
-                f"/api/v1/assessments/{w.assessment_id}/{action}", json={}, headers=w.auth(w.token("admin"))
-            )).status_code == 409
+        # lock/publish carry a re-auth dependency that fires before the state
+        # check, so the lock attempt needs a step-up token to reach the 409.
+        reauthed = await _reauthed(w, "admin")
+        r = await w.client.post(
+            f"/api/v1/assessments/{w.assessment_id}/lock", json={}, headers=w.auth(reauthed)
+        )
+        assert r.status_code == 409, r.text
+        for action in ("approve", "correct"):
+            assert (
+                await w.client.post(
+                    f"/api/v1/assessments/{w.assessment_id}/{action}",
+                    json={},
+                    headers=w.auth(w.token("admin")),
+                )
+            ).status_code == 409
 
     async def test_published_rejects_publish_and_lock(self, world) -> None:
         w = world
         await _drive_to(w, "published")
+        # Both attempts need MFA-reauthed tokens to get past the route's
+        # step-up dependency and reach the state check.
+        secret = await _get_mfa_secret(w, "admin")
+        token = await _reauthed(w, "admin", totp=pyotp.TOTP(secret).now())
         for action in ("lock", "publish"):
-            assert (await w.client.post(
-                f"/api/v1/assessments/{w.assessment_id}/{action}", json={}, headers=w.auth(w.token("admin"))
-            )).status_code == 409
+            r = await w.client.post(
+                f"/api/v1/assessments/{w.assessment_id}/{action}", json={}, headers=w.auth(token)
+            )
+            assert r.status_code == 409, f"{action}: {r.status_code} {r.text}"
 
     async def test_unknown_assessment_is_404(self, world) -> None:
         r = await world.client.post(
-            f"/api/v1/assessments/{uuid4()}/submit", json={}, headers=world.auth(world.token("admin"))
+            f"/api/v1/assessments/{uuid4()}/submit",
+            json={},
+            headers=world.auth(world.token("admin")),
         )
         assert r.status_code == 404
 
@@ -607,7 +752,9 @@ class TestGuards:
         w = world
         await _enter_scores(w, only=("ada", "bayo"))  # chidi's cells stay missing
         r = await w.client.post(
-            f"/api/v1/assessments/{w.assessment_id}/submit", json={}, headers=w.auth(w.token("admin"))
+            f"/api/v1/assessments/{w.assessment_id}/submit",
+            json={},
+            headers=w.auth(w.token("admin")),
         )
         assert r.status_code == 422, r.text
         assert "unresolved" in r.json()["detail"].lower()
@@ -641,7 +788,9 @@ class TestGuards:
         await _post_transition(w, "start-review", w.token("registrar"))
         # No processing run at all yet.
         r = await w.client.post(
-            f"/api/v1/assessments/{w.assessment_id}/approve", json={}, headers=w.auth(w.token("registrar"))
+            f"/api/v1/assessments/{w.assessment_id}/approve",
+            json={},
+            headers=w.auth(w.token("registrar")),
         )
         assert r.status_code == 409, r.text
         assert r.json()["code"] == "INVALID_STATE_TRANSITION"
@@ -666,7 +815,9 @@ class TestGuards:
         await _process_ready(w)
         # Admin submitted, so admin may not approve (SoD on by default)...
         r = await w.client.post(
-            f"/api/v1/assessments/{w.assessment_id}/approve", json={}, headers=w.auth(w.token("admin"))
+            f"/api/v1/assessments/{w.assessment_id}/approve",
+            json={},
+            headers=w.auth(w.token("admin")),
         )
         assert r.status_code == 403, r.text
         # ...but the registrar (not the submitter) can.
@@ -676,7 +827,10 @@ class TestGuards:
         w = world
         async with w.maker() as s:
             await s.execute(
-                text("UPDATE schools SET config = '{\"separation_of_duties\": false}'::jsonb WHERE id = :s"),
+                text(
+                    "UPDATE schools SET config = '{\"separation_of_duties\": false}'::jsonb "
+                    "WHERE id = :s"
+                ),
                 {"s": w.school_id},
             )
             await s.commit()
@@ -759,7 +913,9 @@ class TestDocuments:
         )
         assert r.status_code == 409, r.text  # draft → not printable
 
-    async def test_generation_writes_immutable_v1_rows_and_is_idempotent(self, world, monkeypatch) -> None:
+    async def test_generation_writes_immutable_v1_rows_and_is_idempotent(
+        self, world, monkeypatch
+    ) -> None:
         w = world
         jobs = await _drive_to(w, "published")
         result = await _run_doc_worker(monkeypatch, w, jobs["report_cards"])
@@ -779,7 +935,9 @@ class TestDocuments:
         # Re-generating identical content writes NOTHING (checksum match).
         again = await _run_doc_worker(monkeypatch, w, await _new_doc_job(w, w.assessment_id))
         assert again["generated"] == 0 and again["skipped"] == 3
-        count = await _scalar(w, "SELECT count(*) FROM published_documents WHERE school_id = :s", {"s": w.school_id})
+        count = await _scalar(
+            w, "SELECT count(*) FROM published_documents WHERE school_id = :s", {"s": w.school_id}
+        )
         assert count == 3
 
     async def test_correction_creates_superseding_version(self, world, monkeypatch) -> None:
@@ -794,7 +952,9 @@ class TestDocuments:
         )
 
         # Correct — plain token, no step-up (spec §10 marks no re-auth here).
-        await _post_transition(w, "correct", w.token("registrar"), reason="Ada's exam was 58, not 48")
+        await _post_transition(
+            w, "correct", w.token("registrar"), reason="Ada's exam was 58, not 48"
+        )
         correction_job = await _scalar(
             w,
             "SELECT id FROM jobs WHERE school_id = :s AND type = 'documents.report_cards' "
@@ -807,18 +967,20 @@ class TestDocuments:
         v2 = await _rows(
             w,
             "SELECT doc_version, supersedes_id, correction_reason, checksum, enrolment_id "
-            "FROM published_documents WHERE school_id = :s AND doc_version = 2 ORDER BY enrolment_id",
+            "FROM published_documents WHERE school_id = :s AND doc_version = 2 "
+            "ORDER BY enrolment_id",
             {"s": w.school_id},
         )
         assert len(v2) == 3
         by_se = {r[1]: r for r in v1}
-        for version, supersedes, reason, checksum, seid in v2:
+        for _version, supersedes, reason, _checksum, seid in v2:
             assert supersedes == by_se[seid][0]  # supersedes_id → that student's v1 row
             assert reason == "Ada's exam was 58, not 48"
         # v1 rows untouched — INSERT-only, never updated.
         v1_after = await _rows(
             w,
-            "SELECT id, checksum FROM published_documents WHERE school_id = :s AND doc_version = 1 ORDER BY enrolment_id",
+            "SELECT id, checksum FROM published_documents "
+            "WHERE school_id = :s AND doc_version = 1 ORDER BY enrolment_id",
             {"s": w.school_id},
         )
         assert v1_after == v1
@@ -846,12 +1008,15 @@ class TestDocuments:
         assert body["expires_in"] == 300
         audited = await _rows(
             w,
-            "SELECT action FROM audit_events WHERE school_id = :s AND action = 'documents.downloaded'",
+            "SELECT action FROM audit_events "
+            "WHERE school_id = :s AND action = 'documents.downloaded'",
             {"s": w.school_id},
         )
         assert len(audited) == 1
 
-    async def test_transcript_download_needs_transcripts_permission(self, world, monkeypatch) -> None:
+    async def test_transcript_download_needs_transcripts_permission(
+        self, world, monkeypatch
+    ) -> None:
         """reports.view alone cannot download a transcript — the require()
         dependency itself re-checks the kind-specific permission."""
         w = world
@@ -892,7 +1057,9 @@ class TestDocuments:
         )
         assert r.status_code == 200, r.text
 
-    async def test_transcript_collects_every_published_term_in_order(self, world, monkeypatch) -> None:
+    async def test_transcript_collects_every_published_term_in_order(
+        self, world, monkeypatch
+    ) -> None:
         """Two published assessments (First + Second Term) of the SAME
         class+subject: one transcript, term-ordered, idempotent."""
         w = world
@@ -915,7 +1082,9 @@ class TestDocuments:
 
         seid = w.se_ids["ada"]
         r = await w.client.post(
-            "/api/v1/documents/transcripts", json={"enrolment_id": str(seid)}, headers=w.auth(w.token("registrar"))
+            "/api/v1/documents/transcripts",
+            json={"enrolment_id": str(seid)},
+            headers=w.auth(w.token("registrar")),
         )
         assert r.status_code == 202, r.text
 
@@ -952,7 +1121,10 @@ async def _add_term(w: World, name: str, ordinal: int) -> UUID:
     term = uuid4()
     async with w.maker() as s:
         await s.execute(
-            text("INSERT INTO terms (id, school_id, session_id, name, ordinal) VALUES (:id, :s, :a, :n, :o)"),
+            text(
+                "INSERT INTO terms (id, school_id, session_id, name, ordinal) "
+                "VALUES (:id, :s, :a, :n, :o)"
+            ),
             {"id": term, "s": w.school_id, "a": w.session_id, "n": name, "o": ordinal},
         )
         await s.commit()
@@ -997,7 +1169,9 @@ class TestDefinitionsAndScope:
         from app.workflow.service import WorkflowService
 
         w = world
-        actor = Actor(user_id=w.uid("admin"), school_id=w.school_id, token_version=1, session_id=new_uuid())
+        actor = Actor(
+            user_id=w.uid("admin"), school_id=w.school_id, token_version=1, session_id=new_uuid()
+        )
         data = WorkflowDefinitionCreate(
             name="Registrar-first",
             stages=[StageDef(state="submitted", requires="scores.submit")],
@@ -1020,7 +1194,9 @@ class TestDefinitionsAndScope:
             )
             await s.commit()
         assert replaced.id == created.id  # upsert: same row, stages replaced
-        stages = await _scalar(w, "SELECT stages FROM workflow_definitions WHERE id = :d", {"d": created.id})
+        stages = await _scalar(
+            w, "SELECT stages FROM workflow_definitions WHERE id = :d", {"d": created.id}
+        )
         assert len(stages) == 2 and stages[1]["state"] == "under_review"
 
         with pytest.raises(ProblemError) as excinfo:
@@ -1045,8 +1221,8 @@ class TestDefinitionsAndScope:
         # results.approve is school-scope only: require() denies the
         # assigned-scope teacher outright (no resource context).
         r = await w.client.post(
-            f"/api/v1/assessments/{w.assessment_id}/approve", json={}, headers=w.auth(w.token("teacher"))
+            f"/api/v1/assessments/{w.assessment_id}/approve",
+            json={},
+            headers=w.auth(w.token("teacher")),
         )
         assert r.status_code == 403, r.text
-
-
