@@ -806,7 +806,22 @@ class TestGuards:
         assert r.status_code == 409, r.text  # SUBMITTED is not editable
         await _post_transition(w, "start-review", w.token("registrar"))
         await _post_transition(w, "return", w.token("registrar"), reason="fix CA1")
-        await _enter_scores(w)  # RETURNED is editable again (base_version handled)
+        # RETURNED is editable again: overwrite ada's CA1 with its current
+        # version as base_version (Phase 3 optimistic concurrency).
+        sheet = await w.client.get(
+            f"/api/v1/assessments/{w.assessment_id}/sheet", headers=w.auth(w.token("admin"))
+        )
+        ada = next(
+            row for row in sheet.json()["rows"] if row["subject_enrolment_id"] == str(w.se_ids["ada"])
+        )
+        edit = _cell(w.se_ids["ada"], "CA1", "entered", "9.00")
+        edit["base_version"] = ada["scores"]["CA1"]["version"]
+        r = await w.client.put(
+            f"/api/v1/assessments/{w.assessment_id}/scores",
+            json={"rows": [edit]},
+            headers=w.auth(w.token("admin")),
+        )
+        assert r.status_code == 200, r.text
         sheet = await w.client.get(
             f"/api/v1/assessments/{w.assessment_id}/sheet", headers=w.auth(w.token("admin"))
         )
