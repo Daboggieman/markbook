@@ -1,0 +1,14 @@
+{
+  "name": "markbook",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
+  "scripts": {
+    "web": "npm run dev -w @markbook/web",
+    "web:build": "npm run build -w @markbook/web",
+    "web:test": "npm run test -w @markbook/web",
+    "client:generate": "npm run generate -w @markbook/api-client"
+  }
+}
