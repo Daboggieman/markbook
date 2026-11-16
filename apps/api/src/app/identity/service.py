@@ -23,7 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.identity.models import Session, User
 from app.identity.repository import IdentityRepository
-from app.identity.schemas import LoginResponse, MfaSetupResponse, RefreshResponse
+from app.identity.schemas import (
+    LoginResponse,
+    MfaSetupResponse,
+    RefreshResponse,
+    UserProfileResponse,
+)
 from app.identity.tokens import create_access_token, generate_refresh_token, hash_refresh_token
 from app.platform.config import get_settings
 from app.platform.errors import (
@@ -230,6 +235,35 @@ class IdentityService:
     async def revoke_all_sessions(self, user_id: uuid.UUID) -> None:
         await self._repo.revoke_all_user_sessions(user_id)
         await self._repo.increment_token_version(user_id)
+
+    # ---- profile ------------------------------------------------------------
+
+    async def profile(self, user_id: uuid.UUID) -> schemas.UserProfileResponse:
+        """The signed-in user with their effective permissions (Phase 6).
+
+        The web client renders its navigation from effective_permissions —
+        the UI hides actions it has no permission for; the backend still
+        enforces everything independently (spec: UI hiding is UX, never the
+        gate). Grants come through the access gateway (access.dependency),
+        not access.repository — a forbidden edge (contracts.ini).
+        """
+        from app.access.dependency import load_grants
+
+        user = await self._repo.get_user_by_id(user_id)
+        if user is None:
+            raise ProblemError(NOT_FOUND, "User not found", status=404)
+        grants = await load_grants(self._s, user_id)
+        return UserProfileResponse(
+            user_id=user.id,
+            school_id=user.school_id,
+            email=str(user.email),
+            username=str(user.username),
+            is_super_admin=user.is_super_admin,
+            roles=[],
+            effective_permissions=[
+                schemas.EffectivePermission(code=code, scope_type=scope) for code, scope in grants
+            ],
+        )
 
     # ---- users ------------------------------------------------------------
 

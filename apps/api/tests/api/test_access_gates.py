@@ -208,6 +208,78 @@ class TestRepository:
         await engine.dispose()
 
 
+@pytest.mark.db
+class TestProfile:
+    async def test_users_me_returns_effective_permissions(
+        self, migrated_url: str, monkeypatch
+    ) -> None:
+        """GET /auth/users/me — the endpoint the web nav renders from.
+
+        Needs the platform sessionmaker patched: the route opens a
+        get_actor_db session, and the grants load happens inside profile().
+        """
+        from app.platform import db as platform_db
+
+        engine = create_async_engine(migrated_url)
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        monkeypatch.setattr(platform_db, "_sessionmaker", maker)
+        school, user, role = uuid4(), uuid4(), uuid4()
+        async with engine.begin() as conn:
+            for stmt, params in [
+                (
+                    "INSERT INTO schools (id, name) VALUES (:i, :n) ON CONFLICT (id) DO NOTHING",
+                    {"i": school, "n": "ProfileGap"},
+                ),
+                (
+                    "INSERT INTO users (id, school_id, email, username, password_hash, "
+                    "is_super_admin, status, token_version, failed_login_count) "
+                    "VALUES (:id, :s, :email, :u, :pw, false, 'active', 1, 0)",
+                    {
+                        "id": user,
+                        "s": school,
+                        "email": "me@gap.local",
+                        "u": "gap_me",
+                        "pw": "not-used",
+                    },
+                ),
+                (
+                    "INSERT INTO roles (id, school_id, name, is_super_admin) "
+                    "VALUES (:i, :s, 'Viewer', false)",
+                    {"i": role, "s": school},
+                ),
+                (
+                    "INSERT INTO role_permissions (role_id, permission_code, scope_type) "
+                    "VALUES (:r, :p, :sc)",
+                    {"r": role, "p": "assessments.view", "sc": "school"},
+                ),
+                (
+                    "INSERT INTO user_roles (user_id, role_id, school_id, granted_by) "
+                    "VALUES (:u, :r, :s, NULL)",
+                    {"u": user, "r": role, "s": school},
+                ),
+            ]:
+                await conn.execute(text(stmt), params)
+
+        token, _ = create_access_token(
+            user_id=user, school_id=school, token_version=1, session_id=uuid4()
+        )
+        from app.main import create_app
+
+        app = create_app()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get(
+                "/api/v1/auth/users/me", headers={"Authorization": f"Bearer {token}"}
+            )
+        await engine.dispose()
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["email"] == "me@gap.local"
+        assert body["roles"] == []  # roles stay out of v1; nav uses effective_permissions
+        assert ("assessments.view", "school") in [
+            (p["code"], p["scope_type"]) for p in body["effective_permissions"]
+        ]
+
+
 # ---- schemas: validation contracts nobody imports yet ----------------------------
 
 

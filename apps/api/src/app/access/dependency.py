@@ -77,10 +77,21 @@ async def get_cached_token_version(user_id: UUID) -> int | None:
     return await _cached(user_id)
 
 
-async def _load_grants(session: Any, user_id: UUID) -> list[tuple[str, str]]:
-    """Load effective permissions from the DB; no caching in Phase 1."""
+async def load_grants(session: Any, user_id: UUID) -> list[tuple[str, str]]:
+    """Load effective (permission_code, scope_type) pairs from the DB.
+
+    The sanctioned gateway for other modules that need the actor's grants
+    (e.g. identity's /users/me profile): modules may not import
+    access.repository, but the access-owned grants query is exactly what
+    this edge exists for (contracts.ini gateway note, 2026-10-26).
+    """
     repo = AccessRepository(session)
     return await repo.effective_permissions(user_id)
+
+
+async def _load_grants(session: Any, user_id: UUID) -> list[tuple[str, str]]:
+    """Back-compat alias — internal callers."""
+    return await load_grants(session, user_id)
 
 
 def require(

@@ -111,6 +111,27 @@ async def reauth(
 
 
 # ---------------------------------------------------------------------------
+# Profile
+# ---------------------------------------------------------------------------
+
+
+@router.get("/users/me", response_model=schemas.UserProfileResponse)
+async def users_me(
+    actor: Actor = Depends(authenticated()),
+    session=Depends(get_actor_db),
+) -> schemas.UserProfileResponse:
+    """The signed-in user with their effective permissions (Phase 6).
+
+    The web client renders its navigation from effective_permissions — the
+    UI hides actions the actor lacks, while the backend enforces every
+    action independently. Viewing your own profile needs no permission,
+    hence `authenticated()` rather than `require(...)`.
+    """
+    service = IdentityService(session)
+    return await service.profile(actor.user_id)
+
+
+# ---------------------------------------------------------------------------
 # MFA
 # ---------------------------------------------------------------------------
 
