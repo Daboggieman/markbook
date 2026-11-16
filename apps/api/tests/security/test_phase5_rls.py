@@ -175,9 +175,18 @@ async def _seed_workflow_chain(url: str, school_id, tag: str) -> None:
             (
                 "INSERT INTO published_documents (id, school_id, assessment_id, enrolment_id, "
                 "kind, doc_version, storage_key, checksum, published_by) "
-                "VALUES (:id, :s, :a, :se, 'report_card', 1, 'schools/' || :s || '/x.pdf', "
+                "VALUES (:id, :s, :a, :se, 'report_card', 1, :sk, "
                 "'ab' || 'cd' || 'ef' || '00', :u)",
-                {"id": document, "s": school, "a": assessment, "se": subject_enrolment, "u": user},
+                {
+                    "id": document,
+                    "s": school,
+                    "a": assessment,
+                    "se": subject_enrolment,
+                    "u": user,
+                    # :s must not appear inside the string concat — psycopg would
+                    # have to type $2 as both uuid (school_id) and text (||).
+                    "sk": f"schools/{school}/x.pdf",
+                },
             ),
         ]:
             await conn.execute(text(stmt), params)

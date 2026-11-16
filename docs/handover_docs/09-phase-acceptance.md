@@ -217,10 +217,34 @@ last-SA API ×3, RLS isolation ×2) · `ruff check` clean · `ruff format --chec
 
 | Criterion | Verified | Command + result |
 | --- | --- | --- |
-| Illegal transitions | — | — |
-| Edit lock after submit | — | — |
-| Document immutability | — | — |
-| Audit trail completeness | — | — |
+| Illegal transitions | ✅ 2026-11-13 | `pytest tests/workflow/test_workflow_api.py` → 27 passed. `TestIllegalTransitions`: draft/submitted/approved/locked/published each reject every out-of-table action with 409 INVALID_STATE_TRANSITION (lock/publish probes carry step-up tokens so the reauth gate doesn't mask the state check); the §10 walk in `TestLifecycle` lands all 8 legal edges including the return → resubmit cycle; unknown assessment → 404 |
+| Edit lock after submit | ✅ 2026-11-13 | `TestGuards::test_scores_frozen_after_submit_editable_after_return` — PUT scores while submitted → 409; after return the same cell edits with its current version as `base_version` (Phase 3 optimistic concurrency) and the re-read sheet shows the new value |
+| Document immutability | ✅ 2026-11-13 | `TestDocuments` — worker writes 3 immutable v1 rows; identical re-run generates 0, skips 3 (checksum match); a correction INSERTs v2 with `supersedes_id` → the matching v1 and `correction_reason` stamped, v1 rows byte-identical afterwards (identical checksums prove `force_new`, not the checksum, forced the new version); transcripts 422 before publish, 202 after |
+| Audit trail completeness | ✅ 2026-11-13 | `TestLifecycle` — the draft→published walk asserts 5 approval-record pairs plus audit actions {workflow.submit, workflow.start_review, workflow.approve, workflow.lock, workflow.publish, documents.generation_requested} and both outbox topics in the same transition transaction; transcript download adds `documents.downloaded` |
+| Coverage (strategy gate — not a phase exit criterion) | ✅ 2026-11-13 | `pytest tests --cov=app.grading --cov=app.access --cov=app.workflow` → grading **96%**, access **99%**, workflow **96%**, total **97%** against the 90% minimum on all three (05-testing-strategy.md) |
+
+#### Phase 5 notes and deviations (2026-11-13)
+
+- **Phase 1 model/migration drift found by the coverage gate (2 bugs fixed).** The
+  90% gate forced the first real exercise of the Phase 1 role-management seam, which
+  no API ever called: `UserRole` was missing `school_id` (NOT NULL in migration
+  0002 — every ORM insert would have violated it), and `RolePermission.scope_type`
+  was mapped `String(20)` against the `scopetype` enum (Postgres refuses the VARCHAR
+  parameter; the house `SAEnum` pattern from `identity/models.py` now applied). Both
+  invisible until then because all seed paths use raw SQL.
+- **Dependency resolution order on lock/publish**: `require(...)` resolves before
+  `require_reauth()` (signature order), so a plain token pays a grants DB load before
+  the 401 REAUTH_REQUIRED. Reauth-minted tokens carry `reauth_at` (+`reauth_mfa` only
+  when TOTP verified); the expired-window refusal is tested with a stale-claim token.
+- **Reauth has deliberately no lockout/throttling** (contrast login): it sits behind
+  an already-valid session. Flagged for the Phase 8 hardening review.
+- **Corrections bypass checksum dedup by design** (`force_new`): identical content
+  still versions, because the correction reason is the record.
+- **Test-runtime note**: with Redis absent, `enqueue_job` fails open (returns False)
+  but arq's `create_pool` retries make each 202 call ~13s; the suites set
+  `MARKBOOK_REDIS_URL` to a refused port to fail fast instead.
+- `.env.example` host ports corrected to match `infra/compose.dev.yml` (5433/6380) —
+  the previous values described a stack nobody runs.
 
 ---
 

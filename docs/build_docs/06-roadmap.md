@@ -99,6 +99,6 @@ load targets met; pilot checklist signed off.
 
 ## Current status
 
-Planning phase. Phase 0 not started. The running record of where the build actually is lives in
+The running record of where the build actually is lives in
 [`../handover_docs/01-current-state.md`](../handover_docs/01-current-state.md) — this roadmap
 holds the plan, never the status.

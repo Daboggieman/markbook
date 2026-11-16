@@ -80,9 +80,18 @@ class AccessRepository:
         await self._s.flush()
 
     async def assign_role_to_user(
-        self, *, user_id: UUID, role_id: UUID, granted_by: UUID | None
+        self, *, user_id: UUID, role_id: UUID, school_id: UUID, granted_by: UUID | None
     ) -> None:
-        self._s.add(UserRole(user_id=user_id, role_id=role_id, granted_by=granted_by))
+        # school_id is NOT NULL in migration 0002 (RLS denormalisation) — a
+        # grant is always issued within one school's context.
+        self._s.add(
+            UserRole(
+                user_id=user_id,
+                role_id=role_id,
+                school_id=school_id,
+                granted_by=granted_by,
+            )
+        )
         await self._s.flush()
 
     async def is_super_admin(self, user_id: UUID) -> bool:

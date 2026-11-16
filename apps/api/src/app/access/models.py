@@ -10,6 +10,9 @@ from sqlalchemy import (
     Index,
     String,
 )
+from sqlalchemy import (
+    Enum as SAEnum,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -61,7 +64,14 @@ class RolePermission(Base):
     permission_code: Mapped[str] = mapped_column(
         String(100), ForeignKey("permissions.code"), primary_key=True
     )
-    scope_type: Mapped[str] = mapped_column(String(20), nullable=False, default="school")
+    # Mirrors the scopetype enum created by migration 0002 — declaring it as
+    # SAEnum makes INSERTs render ::scopetype, not ::VARCHAR (which Postgres
+    # refuses to cast to the enum column).
+    scope_type: Mapped[str] = mapped_column(
+        SAEnum("school", "assigned", "own", name="scopetype", native_enum=True),
+        nullable=False,
+        default="school",
+    )
 
     role: Mapped["Role"] = relationship("Role", back_populates="permissions")
     permission: Mapped["Permission"] = relationship("Permission", back_populates="role_permissions")
@@ -77,6 +87,11 @@ class UserRole(Base):
     )
     role_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    )
+    # NOT NULL in migration 0002 (RLS denormalisation, like other tenant rows)
+    # — the model must carry it or every ORM insert violates the constraint.
+    school_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("schools.id"), nullable=False
     )
     granted_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     granted_at: Mapped[datetime] = mapped_column(

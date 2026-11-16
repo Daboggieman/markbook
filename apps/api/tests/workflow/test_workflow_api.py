@@ -388,6 +388,17 @@ def _cell(se_id: UUID, key: str, status: str, value=None) -> dict:
     }
 
 
+async def _sheet_row(w: World, student: str) -> dict:
+    """One student's row from the sheet as it stands right now."""
+    r = await w.client.get(
+        f"/api/v1/assessments/{w.assessment_id}/sheet", headers=w.auth(w.token("admin"))
+    )
+    assert r.status_code == 200, r.text
+    return next(
+        row for row in r.json()["rows"] if row["subject_enrolment_id"] == str(w.se_ids[student])
+    )
+
+
 async def _enter_scores(w: World, assessment_id: UUID | None = None, *, only=None) -> None:
     assessment_id = assessment_id or w.assessment_id
     # Existing cells carry a version — overwriting one (the return → edit
@@ -808,12 +819,7 @@ class TestGuards:
         await _post_transition(w, "return", w.token("registrar"), reason="fix CA1")
         # RETURNED is editable again: overwrite ada's CA1 with its current
         # version as base_version (Phase 3 optimistic concurrency).
-        sheet = await w.client.get(
-            f"/api/v1/assessments/{w.assessment_id}/sheet", headers=w.auth(w.token("admin"))
-        )
-        ada = next(
-            row for row in sheet.json()["rows"] if row["subject_enrolment_id"] == str(w.se_ids["ada"])
-        )
+        ada = await _sheet_row(w, "ada")
         edit = _cell(w.se_ids["ada"], "CA1", "entered", "9.00")
         edit["base_version"] = ada["scores"]["CA1"]["version"]
         r = await w.client.put(
@@ -822,12 +828,7 @@ class TestGuards:
             headers=w.auth(w.token("admin")),
         )
         assert r.status_code == 200, r.text
-        sheet = await w.client.get(
-            f"/api/v1/assessments/{w.assessment_id}/sheet", headers=w.auth(w.token("admin"))
-        )
-        ada = next(
-            row for row in sheet.json()["rows"] if row["subject_enrolment_id"] == str(w.se_ids["ada"])
-        )
+        ada = await _sheet_row(w, "ada")
         assert float(ada["scores"]["CA1"]["value"]) == 9.0  # the edit landed
 
     async def test_approve_requires_a_current_successful_run(self, world) -> None:

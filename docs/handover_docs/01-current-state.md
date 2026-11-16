@@ -1,9 +1,9 @@
-# Current state — 2026-11-11
+# Current state — 2026-11-13
 
-> **Working branch: `markbook_phase_4`** (cut from the `markbook_phase_3` tip `4a8c23c`,
-> 2026-11-11, at Phase 4 start). Phase 3 lives on `markbook_phase_3`; Phase 2 on
+> **Working branch: `markbook_phase_5`** (cut from `markbook_phase_4` at Phase 5 start).
+> Phase 4 lives on `markbook_phase_4`; Phase 3 on `markbook_phase_3`; Phase 2 on
 > `markbook_phase_2`; Phase 1 on `markbook_phase_1`; Phase 0 on `markbook_phase_0` / `master` (PR #1).
-> Next: Phase 5 — workflow, locking, publication, documents.
+> Next: Phase 6 — web client.
 
 ## Phase board
 
@@ -14,7 +14,7 @@
 | 2 — People and academic structure | ✅ **COMPLETE** | 2026-11-02 | All exit criteria verified live: full suite **83 passed** (incl. 25 testcontainer tests), ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 3 — Assessment templates and score entry | ✅ **COMPLETE** | 2026-11-06 | All exit criteria verified live: full suite **125 passed** (incl. 42 testcontainer tests), ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 4 — Calculation engine and processing | ✅ **COMPLETE** | 2026-11-11 | All exit criteria verified live: full suite **193 passed** (incl. 77 testcontainer-gated tests), coverage on `app.grading` **96%**, ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
-| 5 — Workflow, locking, publication, documents | not started | — | |
+| 5 — Workflow, locking, publication, documents | ✅ **COMPLETE** | 2026-11-13 | All exit criteria verified live: full suite **243 passed** (exit 0), coverage grading **96%** / access **99%** / workflow **96%**, ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 6 — Web client | not started | — | |
 | 7 — Desktop client and sync | not started | — | |
 | 8 — Hardening and pilot | not started | — | |
@@ -47,6 +47,54 @@
 sit in [`09-phase-acceptance.md`](09-phase-acceptance.md) as PENDING.
 
 **Result: Partial — local gates green, Docker-dependent gates pending.**
+
+## Phase 5 status — COMPLETE 2026-11-13
+
+All Phase 5 deliverables are built and all exit criteria verified live (full suite
+**243 passed**, exit 0). Sign-off detail and the two Phase 1 model bugs the coverage
+gate exposed are in [`09-phase-acceptance.md`](09-phase-acceptance.md).
+
+### Deliverables
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| State machine with configurable stages | ✅ Built | `workflow/models.py` + `workflow/service.py`; definitions upsertable (stages replaced on save); unknown state rejected |
+| §10 transition table (8 edges) | ✅ Built + tested | `TRANSITIONS` in `workflow/service.py`; permission/guard/reason/document_job flags mirror the spec table row-for-row (`test_transitions_table.py`) |
+| Approval records | ✅ Built | One from→to record per transition in the same transaction; 5 pairs asserted on the full walk |
+| Step-up auth + MFA on publish | ✅ Built | `require_reauth()` (300s window) on lock; +`reauth_mfa` claim on publish; REAUTH_REQUIRED / MFA_REQUIRED / expired-window all over real HTTP |
+| Publication + PDF generation job | ✅ Built | `documents/jobs.py` — worker entry points with `_renderer`/`_storage_factory` seams; enqueue on the publish transition (ADR 005) |
+| Report cards + transcripts | ✅ Built | report cards per published assessment; transcripts collect every published term ordered; download via presigned URL + audit |
+| Correction versioning | ✅ Built | `published_documents` INSERT-only; corrections force vN+1 with `supersedes_id` + `correction_reason` |
+| RLS on the three Phase 5 tables | ✅ Verified live | `tests/security/test_phase5_rls.py` — cross-tenant reads blocked through the app role |
+| Audit trail per action (exit criterion) | ✅ Verified live | full walk asserts audit actions + both outbox topics inside each transition transaction |
+
+### Exit criteria
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| Every illegal transition rejected | ✅ Verified live | `TestIllegalTransitions` — 409 INVALID_STATE_TRANSITION on every out-of-table action from every state |
+| Edits blocked after submit | ✅ Verified live | 409 while submitted; editable again after return with `base_version` optimistic concurrency |
+| Published documents immutable; corrections supersede | ✅ Verified live | identical re-run generates 0 / skips 3; correction v2 supersedes v1, v1 untouched |
+| Every action in the audit log | ✅ Verified live | audit + outbox asserted per transition; download audited too |
+
+**Measured gates, 2026-11-13 (final)** (run from `apps/api` with `.venv`):
+`ruff check` clean (src+tests) · `ruff format` clean (114 files) ·
+`mypy src/app` → Success (79 files) · `lint-imports` 4/4 KEPT ·
+`pytest tests` → **243 passed**, exit 0 · coverage grading **96%** / access **99%** /
+workflow **96%** against the ≥90% gate on all three (05-testing-strategy.md).
+
+### Phase 5 notes
+
+- **The access coverage gate found two Phase 1 model/migration drifts** (both fixed):
+  `UserRole` lacked `school_id` (NOT NULL in migration 0002 — any ORM insert would
+  violate it) and `RolePermission.scope_type` was `String(20)` against the
+  `scopetype` enum (VARCHAR param refused). Neither had ever been exercised — no
+  roles API exists yet; all seeds use raw SQL. Detail in the acceptance doc.
+- `scores.edit` (edit-after-submit gating, carried from Phase 3's note) landed here:
+  submitted blocks score writes (409), returned allows them with optimistic
+  concurrency.
+- Reauth deliberately has no lockout/throttling (contrast login) — flagged for the
+  Phase 8 hardening review.
 
 ## Phase 2 status — COMPLETE 2026-11-02
 
