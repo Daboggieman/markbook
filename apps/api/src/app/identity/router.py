@@ -11,6 +11,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 
 from app.access.dependency import authenticated, get_actor_db, public, require
+from app.access.schemas import UserProfileResponse
 from app.access.service import Actor
 from app.identity import schemas
 from app.identity.service import IdentityService
@@ -115,11 +116,11 @@ async def reauth(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/users/me", response_model=schemas.UserProfileResponse)
+@router.get("/users/me", response_model=UserProfileResponse)
 async def users_me(
     actor: Actor = Depends(authenticated()),
     session=Depends(get_actor_db),
-) -> schemas.UserProfileResponse:
+) -> UserProfileResponse:
     """The signed-in user with their effective permissions (Phase 6).
 
     The web client renders its navigation from effective_permissions — the

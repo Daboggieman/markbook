@@ -21,14 +21,10 @@ import pyotp
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.access.schemas import EffectivePermission, UserProfileResponse
 from app.identity.models import Session, User
 from app.identity.repository import IdentityRepository
-from app.identity.schemas import (
-    LoginResponse,
-    MfaSetupResponse,
-    RefreshResponse,
-    UserProfileResponse,
-)
+from app.identity.schemas import LoginResponse, MfaSetupResponse, RefreshResponse
 from app.identity.tokens import create_access_token, generate_refresh_token, hash_refresh_token
 from app.platform.config import get_settings
 from app.platform.errors import (
@@ -238,7 +234,7 @@ class IdentityService:
 
     # ---- profile ------------------------------------------------------------
 
-    async def profile(self, user_id: uuid.UUID) -> schemas.UserProfileResponse:
+    async def profile(self, user_id: uuid.UUID) -> UserProfileResponse:
         """The signed-in user with their effective permissions (Phase 6).
 
         The web client renders its navigation from effective_permissions —
@@ -261,7 +257,7 @@ class IdentityService:
             is_super_admin=user.is_super_admin,
             roles=[],
             effective_permissions=[
-                schemas.EffectivePermission(code=code, scope_type=scope) for code, scope in grants
+                EffectivePermission(code=code, scope_type=scope) for code, scope in grants
             ],
         )
 
