@@ -1,0 +1,92 @@
+:root {
+  color-scheme: light dark;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+input,
+button {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+
+.app-nav {
+  border-right: 1px solid rgba(128, 128, 128, 0.35);
+  padding: 1rem 0.75rem;
+}
+
+.app-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.app-nav a {
+  display: block;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.app-nav a.active {
+  background: rgba(59, 130, 246, 0.15);
+  font-weight: 600;
+}
+
+.app-main {
+  padding: 1.25rem 1.5rem;
+}
+
+.auth-card {
+  max-width: 360px;
+  margin: 18vh auto 0;
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 10px;
+}
+
+.auth-card label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.auth-error {
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+button {
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background: transparent;
+  padding: 0.45rem 0.9rem;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

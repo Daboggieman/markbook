@@ -1,0 +1,27 @@
+import { Navigate, Outlet, Route, Routes } from "react-router";
+
+import { useAuth } from "./auth/AuthContext";
+import { DashboardPage } from "./pages/DashboardPage";
+import { LoginPage } from "./pages/LoginPage";
+import { ShellPage } from "./pages/ShellPage";
+
+function RequireAuth() {
+  const { profile, booting } = useAuth();
+  if (booting) return <p role="status">Signing in…</p>;
+  if (!profile) return <Navigate to="/login" replace />;
+  return <Outlet />;
+}
+
+export function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<RequireAuth />}>
+        <Route path="/" element={<ShellPage />}>
+          <Route index element={<DashboardPage />} />
+        </Route>
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
