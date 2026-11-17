@@ -16,7 +16,7 @@
     "react-router": "^7.9.0"
   },
   "devDependencies": {
-    "@testing-library/dom": "^11.0.0",
+    "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.3.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
