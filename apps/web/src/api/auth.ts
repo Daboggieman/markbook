@@ -16,7 +16,7 @@ export interface LoginResult {
 }
 
 export async function login(email: string, password: string): Promise<LoginResult> {
-  const { data, error } = await api.POST("/auth/login", {
+  const { data, error } = await api.POST("/api/v1/auth/login", {
     body: { email, password },
   });
   if (error || !data) {
@@ -30,7 +30,7 @@ export async function login(email: string, password: string): Promise<LoginResul
 
 export async function logout(): Promise<void> {
   try {
-    await api.POST("/auth/logout", {});
+    await api.POST("/api/v1/auth/logout", {});
   } catch {
     // best-effort — clearing local state is the part that matters
   }
@@ -38,6 +38,6 @@ export async function logout(): Promise<void> {
 }
 
 export async function fetchProfile(): Promise<Profile | null> {
-  const { data } = await api.GET("/auth/users/me", {});
+  const { data } = await api.GET("/api/v1/auth/users/me", {});
   return data ?? null;
 }
