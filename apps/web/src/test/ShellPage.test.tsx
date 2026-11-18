@@ -48,6 +48,8 @@ describe("shell navigation (UI hides unauthorised actions)", () => {
       baseAuth(profileWith([["assessments.view", "school"], ["scores.enter", "assigned"]])),
     );
     expect(screen.getByRole("link", { name: "Assessments" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Academic" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Students" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Users" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Reports" })).toBeNull();
   });
@@ -56,13 +58,15 @@ describe("shell navigation (UI hides unauthorised actions)", () => {
     renderShellWith(
       baseAuth(
         profileWith([
+          ["academic.view", "school"],
           ["assessments.view", "school"],
+          ["students.view", "school"],
           ["users.view", "school"],
           ["reports.view", "school"],
         ]),
       ),
     );
-    for (const name of ["Assessments", "Users", "Reports"]) {
+    for (const name of ["Academic", "Students", "Assessments", "Users", "Reports"]) {
       expect(screen.getByRole("link", { name })).toBeTruthy();
     }
   });
