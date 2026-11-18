@@ -29,7 +29,7 @@ from app.platform.db import (  # noqa: E402
 )
 
 SCHOOL_ID = "00000000-0000-7000-8000-000000000001"  # 'Seed School' from 0001
-SUPER_ADMIN_ROLE_ID = "00000000-0000-7000-8000-000000000001"  # from 0002
+SUPER_ADMIN_ROLE_ID = "00000000-0000-7000-8000-000000001001"  # from 0002
 
 
 async def main() -> int:
@@ -59,10 +59,10 @@ async def main() -> int:
         # authorize() reads grants from user_roles only — attach the role.
         await session.execute(
             text(
-                "INSERT INTO user_roles (user_id, role_id) VALUES (:u, :r)"
-                " ON CONFLICT DO NOTHING"
+                "INSERT INTO user_roles (user_id, role_id, school_id)"
+                " VALUES (:u, :r, :s) ON CONFLICT DO NOTHING"
             ),
-            {"u": str(user.id), "r": SUPER_ADMIN_ROLE_ID},
+            {"u": str(user.id), "r": SUPER_ADMIN_ROLE_ID, "s": SCHOOL_ID},
         )
         await session.commit()
         print(f"created super admin {email} (user_id={user.id})")
@@ -71,4 +71,7 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        # psycopg async cannot run on the default ProactorEventLoop.
+        raise SystemExit(asyncio.run(main(), loop_factory=asyncio.SelectorEventLoop))
     raise SystemExit(asyncio.run(main()))

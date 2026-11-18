@@ -7,6 +7,8 @@ Exits:
 """
 
 from contextlib import asynccontextmanager
+import asyncio
+import sys
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -20,6 +22,11 @@ from app.platform.errors import (
     problem_exception_handler,
 )
 from app.platform.logging import configure_logging, set_request_context
+
+if sys.platform == "win32":
+    # psycopg async cannot run on Windows' default ProactorEventLoop; the
+    # selector loop is the documented fix and is inert on Linux (prod).
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 @asynccontextmanager
