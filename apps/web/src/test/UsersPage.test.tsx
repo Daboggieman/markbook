@@ -199,7 +199,14 @@ describe("UsersPage", () => {
   });
 
   it("hides the create form and status controls without the manage permissions", async () => {
-    getUsersReturns([userRow(), userRow({ username: "root", is_super_admin: true })]);
+    getUsersReturns([
+      userRow(),
+      userRow({
+        id: "00000000-0000-7000-8000-000000000002",
+        username: "root",
+        is_super_admin: true,
+      }),
+    ]);
     renderUsersPage([["users.view", "school"]]);
 
     expect(await screen.findByRole("cell", { name: "jdoe" })).toBeTruthy();
