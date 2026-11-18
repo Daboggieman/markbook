@@ -58,5 +58,3 @@ export async function unwrap<T>(
   if (data === undefined) throw { status: 0, code: "EMPTY", detail: "No response body", title: "Empty response", type: "about:blank" };
   return data;
 }
-
-export { isProblem };
