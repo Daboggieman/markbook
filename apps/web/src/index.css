@@ -90,3 +90,107 @@ button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* --- admin screen atoms --- */
+
+.page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.page-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.page-note {
+  color: rgba(128, 128, 128, 0.9);
+  font-size: 0.9rem;
+}
+
+.panel {
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 10px;
+  padding: 0.9rem 1rem 1.1rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.panel-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: end;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px dashed rgba(128, 128, 128, 0.3);
+}
+
+.field {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.8rem;
+}
+
+.field input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.field input,
+.field select {
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background: transparent;
+  color: inherit;
+  min-width: 8rem;
+}
+
+.error-banner {
+  margin: 0.25rem 0 0;
+  color: #b91c1c;
+  font-size: 0.85rem;
+}
+
+.loading,
+.empty {
+  color: rgba(128, 128, 128, 0.9);
+  font-size: 0.9rem;
+  margin: 0.25rem 0 0;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.data-table th {
+  font-weight: 600;
+  color: rgba(128, 128, 128, 0.95);
+}
+
+.data-table td:last-child,
+.data-table th:last-child {
+  text-align: right;
+}

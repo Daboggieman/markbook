@@ -11,6 +11,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Dashboard" },
+  { to: "/academic", label: "Academic", permission: "academic.view" },
+  { to: "/students", label: "Students", permission: "students.view" },
   { to: "/assessments", label: "Assessments", permission: "assessments.view" },
   { to: "/users", label: "Users", permission: "users.view" },
   { to: "/reports", label: "Reports", permission: "reports.view" },

@@ -1,9 +1,13 @@
 import { Navigate, Outlet, Route, Routes } from "react-router";
 
 import { useAuth } from "./auth/AuthContext";
+import { AcademicPage } from "./pages/AcademicPage";
+import { AssessmentsPage } from "./pages/AssessmentsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ShellPage } from "./pages/ShellPage";
+import { StudentsPage } from "./pages/StudentsPage";
+import { UsersPage } from "./pages/UsersPage";
 
 function RequireAuth() {
   const { profile, booting } = useAuth();
@@ -19,6 +23,10 @@ export function AppRoutes() {
       <Route element={<RequireAuth />}>
         <Route path="/" element={<ShellPage />}>
           <Route index element={<DashboardPage />} />
+          <Route path="academic" element={<AcademicPage />} />
+          <Route path="students" element={<StudentsPage />} />
+          <Route path="assessments" element={<AssessmentsPage />} />
+          <Route path="users" element={<UsersPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
