@@ -1,9 +1,10 @@
-# Current state — 2026-11-13
+# Current state — 2026-11-18
 
-> **Working branch: `markbook_phase_5`** (cut from `markbook_phase_4` at Phase 5 start).
-> Phase 4 lives on `markbook_phase_4`; Phase 3 on `markbook_phase_3`; Phase 2 on
-> `markbook_phase_2`; Phase 1 on `markbook_phase_1`; Phase 0 on `markbook_phase_0` / `master` (PR #1).
-> Next: Phase 6 — web client.
+> **Working branch: `markbook_phase_6`** (cut from the Phase 5 tip, 2026-11-16, at Phase 6
+> start). Phase 5 lives on `markbook_phase_5`; Phase 4 on `markbook_phase_4`; Phase 3 on
+> `markbook_phase_3`; Phase 2 on `markbook_phase_2`; Phase 1 on `markbook_phase_1`;
+> Phase 0 on `markbook_phase_0` / `master` (PR #1).
+> In progress: Phase 6 — web client.
 
 ## Phase board
 
@@ -15,7 +16,7 @@
 | 3 — Assessment templates and score entry | ✅ **COMPLETE** | 2026-11-06 | All exit criteria verified live: full suite **125 passed** (incl. 42 testcontainer tests), ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 4 — Calculation engine and processing | ✅ **COMPLETE** | 2026-11-11 | All exit criteria verified live: full suite **193 passed** (incl. 77 testcontainer-gated tests), coverage on `app.grading` **96%**, ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 5 — Workflow, locking, publication, documents | ✅ **COMPLETE** | 2026-11-13 | All exit criteria verified live: full suite **243 passed** (exit 0), coverage grading **96%** / access **99%** / workflow **96%**, ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
-| 6 — Web client | not started | — | |
+| 6 — Web client | 🚧 **In progress** | started 2026-11-16 | Scaffold + generated API client + auth flow + shell landed (`ad803a7`…`0f08060`); admin screens being built |
 | 7 — Desktop client and sync | not started | — | |
 | 8 — Hardening and pilot | not started | — | |
 
