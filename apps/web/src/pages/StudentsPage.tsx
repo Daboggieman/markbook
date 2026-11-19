@@ -49,9 +49,12 @@ function CreateForm({
         e.preventDefault();
         setBusy(true);
         setError(null);
+        // Capture the element now: React nulls e.currentTarget once this
+        // handler yields at the await, so reset() must use the local ref.
+        const form = e.currentTarget;
         try {
-          await onSubmit(new FormData(e.currentTarget));
-          e.currentTarget.reset();
+          await onSubmit(new FormData(form));
+          form.reset();
         } catch (err) {
           setError(problemMessage(err));
         } finally {
