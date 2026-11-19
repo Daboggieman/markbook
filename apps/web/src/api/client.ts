@@ -80,12 +80,23 @@ export async function refreshAccessToken(): Promise<string | null> {
 }
 
 const authedFetch: typeof fetch = async (input, init) => {
-  const headers = new Headers(init?.headers);
+  // openapi-fetch hands us a fully-formed Request (init may be empty), so the
+  // headers must come from the REQUEST, not from init: building them from
+  // init alone drops the Request's Content-Type, FastAPI can no longer parse
+  // the body, and every POST dies as a 422 with an array detail ("[object
+  // Object]" in the UI). With a string input, init still carries everything.
+  const headers = new Headers(input instanceof Request ? input.headers : init?.headers);
   const access = tokens.access;
   if (access && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${access}`);
   }
-  let res = await fetch(input, { ...init, headers });
+  // A fresh Request per call so a 401-retry can re-send the body.
+  const source = input instanceof Request ? input.clone() : input;
+  const build = (): Request =>
+    input instanceof Request
+      ? new Request(source, { headers })
+      : new Request(source, { ...(init ?? {}), headers });
+  let res = await fetch(build());
   if (res.status === 401 && tokens.access) {
     refreshing ??= refreshAccessToken().finally(() => {
       refreshing = null;
@@ -95,7 +106,7 @@ const authedFetch: typeof fetch = async (input, init) => {
     refreshInFlight = false;
     if (fresh) {
       headers.set("Authorization", `Bearer ${fresh}`);
-      res = await fetch(input, { ...init, headers });
+      res = await fetch(build());
     }
   }
   return res;

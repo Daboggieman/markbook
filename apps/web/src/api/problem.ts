@@ -25,6 +25,14 @@ export function isProblem(error: unknown): error is Problem {
 
 /** The human-readable message for any error from openapi-fetch. */
 export function problemMessage(error: unknown): string {
+  // FastAPI's default validation handler (422) is NOT our Problem shape —
+  // it puts an array of {loc, msg, type} under `detail`. Handle it first.
+  const detail = (error as { detail?: unknown } | null)?.detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((e) => `${(e.loc ?? []).map(String).join(".")}: ${e.msg}`)
+      .join("; ");
+  }
   if (isProblem(error)) {
     if (error.errors?.length) {
       return error.errors.map((e) => `${e.loc.join(".")}: ${e.msg}`).join("; ");
