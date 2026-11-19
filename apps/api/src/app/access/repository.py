@@ -2,10 +2,10 @@
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.access.models import Role, RolePermission, UserRole
+from app.access.models import Permission, Role, RolePermission, UserRole
 
 
 class AccessRepository:
@@ -102,3 +102,36 @@ class AccessRepository:
             .limit(1)
         )
         return bool(result.scalar_one_or_none())
+
+    # ---- roles platform (Phase 6) -----------------------------------------
+
+    async def permissions_all(self) -> list[Permission]:
+        """The global catalogue seeded by migration 0002 — never mutated."""
+        result = await self._s.execute(select(Permission).order_by(Permission.code))
+        return list(result.scalars().all())
+
+    async def permissions_for_roles(
+        self, role_ids: list[UUID]
+    ) -> dict[UUID, list[tuple[str, str]]]:
+        """(permission_code, scope_type) grants grouped by role, one query."""
+        if not role_ids:
+            return {}
+        result = await self._s.execute(
+            select(
+                RolePermission.role_id,
+                RolePermission.permission_code,
+                RolePermission.scope_type,
+            ).where(RolePermission.role_id.in_(role_ids))
+        )
+        out: dict[UUID, list[tuple[str, str]]] = {}
+        for role_id, code, scope in result:
+            out.setdefault(role_id, []).append((code, scope))
+        return out
+
+    async def unassign_role_from_user(self, user_id: UUID, role_id: UUID) -> bool:
+        """Revoke one role grant; True when a junction row was removed."""
+        result = await self._s.execute(
+            delete(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role_id)
+        )
+        await self._s.flush()
+        return bool(result.rowcount)

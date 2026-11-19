@@ -34,6 +34,10 @@ class RolePermissionAssign(BaseModel):
     scope_type: Annotated[str, Field(pattern="^(school|assigned|own)$", default="school")]
 
 
+class UserRoleAssign(BaseModel):
+    role_id: UUID
+
+
 class PermissionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
