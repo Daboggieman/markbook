@@ -155,8 +155,8 @@ function CreateStudentPanel({ canCreate, onCreated }: { canCreate: boolean; onCr
         <Field label="Sex">
           <select name="sex" defaultValue="">
             <option value="">—</option>
-            <option value="male">male</option>
-            <option value="female">female</option>
+            <option value="m">Male</option>
+            <option value="f">Female</option>
           </select>
         </Field>
         <Field label="Admission no.">
@@ -397,7 +397,7 @@ function StudentsPageInner() {
                   {s.first_name} {s.middle_name ?? ""} {s.last_name}
                 </td>
                 <td>{s.admission_no ?? "—"}</td>
-                <td>{s.sex ?? "—"}</td>
+                <td>{s.sex === "m" ? "Male" : s.sex === "f" ? "Female" : (s.sex ?? "—")}</td>
                 <td>{s.dob ?? "—"}</td>
                 <td>{s.status}</td>
                 <td>

@@ -16,10 +16,18 @@ function RequireAuth() {
   return <Outlet />;
 }
 
+/** Mirror of RequireAuth: a signed-in actor has no business on /login. */
+function LoginRoute() {
+  const { profile, booting } = useAuth();
+  if (booting) return <p role="status">Signing in…</p>;
+  if (profile) return <Navigate to="/" replace />;
+  return <LoginPage />;
+}
+
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/login" element={<LoginRoute />} />
       <Route element={<RequireAuth />}>
         <Route path="/" element={<ShellPage />}>
           <Route index element={<DashboardPage />} />
