@@ -5,6 +5,7 @@ import { AcademicPage } from "./pages/AcademicPage";
 import { AssessmentsPage } from "./pages/AssessmentsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
+import { ScoreSheetPage } from "./pages/ScoreSheetPage";
 import { ShellPage } from "./pages/ShellPage";
 import { StudentsPage } from "./pages/StudentsPage";
 import { UsersPage } from "./pages/UsersPage";
@@ -34,6 +35,7 @@ export function AppRoutes() {
           <Route path="academic" element={<AcademicPage />} />
           <Route path="students" element={<StudentsPage />} />
           <Route path="assessments" element={<AssessmentsPage />} />
+          <Route path="assessments/:assessmentId/sheet" element={<ScoreSheetPage />} />
           <Route path="users" element={<UsersPage />} />
         </Route>
       </Route>

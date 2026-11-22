@@ -130,9 +130,11 @@ async def list_assessments(
     term_id: UUID | None = Query(default=None),
     class_id: UUID | None = Query(default=None),
     subject_id: UUID | None = Query(default=None),
+    workflow_state: str | None = Query(default=None),
 ) -> list[schemas.AssessmentResponse]:
     """Scope-filtered (spec §7.2): 'assigned' callers see only assessments
-    covered by their teacher assignments."""
+    covered by their teacher assignments. `workflow_state` is the review
+    queue's filter (Phase 6 — reviewers list submitted/under_review)."""
     actor, scope = auth
     service = AssessmentService(session)
     rows = await service.list_assessments(
@@ -142,6 +144,7 @@ async def list_assessments(
         term_id=term_id,
         class_id=class_id,
         subject_id=subject_id,
+        workflow_state=workflow_state,
     )
     return [schemas.AssessmentResponse.model_validate(r) for r in rows]
 

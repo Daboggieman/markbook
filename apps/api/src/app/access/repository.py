@@ -1,8 +1,10 @@
 """Access repository — SQL queries (Phase 1)."""
 
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import delete, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.access.models import Permission, Role, RolePermission, UserRole
@@ -130,8 +132,11 @@ class AccessRepository:
 
     async def unassign_role_from_user(self, user_id: UUID, role_id: UUID) -> bool:
         """Revoke one role grant; True when a junction row was removed."""
-        result = await self._s.execute(
-            delete(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role_id)
+        result = cast(
+            CursorResult,
+            await self._s.execute(
+                delete(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role_id)
+            ),
         )
         await self._s.flush()
         return bool(result.rowcount)

@@ -207,13 +207,15 @@ function AssessmentsPageInner() {
   const [sessionId, setSessionId] = useState("");
   const [classId, setClassId] = useState("");
   const [subjectId, setSubjectId] = useState("");
+  const [state, setState] = useState("");
   const { ref, error: refError } = useReference(sessionId, classId);
   const listQ = useApiQuery(() => {
     const query: Record<string, string> = {};
     if (classId) query.class_id = classId;
     if (subjectId) query.subject_id = subjectId;
+    if (state) query.workflow_state = state;
     return unwrap(api.GET("/api/v1/assessments", { params: { query } }));
-  }, [classId, subjectId]);
+  }, [classId, subjectId, state]);
   const termName = (id: string): string => ref?.terms.find((t) => t.id === id)?.name ?? id.slice(0, 8);
   const className = (id: string): string => ref?.classes.find((c) => c.id === id)?.name ?? id.slice(0, 8);
   const subjectName = (id: string): string => ref?.subjects.find((s) => s.id === id)?.name ?? id.slice(0, 8);
@@ -253,13 +255,25 @@ function AssessmentsPageInner() {
               ))}
             </select>
           </Field>
+          <Field label="Workflow state">
+            <select value={state} onChange={(e) => setState(e.target.value)}>
+              <option value="">all</option>
+              {["draft", "returned", "submitted", "under_review", "approved", "locked", "published"].map(
+                (s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ),
+              )}
+            </select>
+          </Field>
         </div>
         {refError && <ErrorBanner message={refError} />}
         {listQ.loading && <Loading />}
         {listQ.error && <ErrorBanner message={listQ.error} />}
         {listQ.data && listQ.data.length === 0 && <Empty label="No assessments yet." />}
         {listQ.data && listQ.data.length > 0 && (
-          <DataTable headers={["Subject", "Term", "Class", "Workflow state"]}>
+          <DataTable headers={["Subject", "Term", "Class", "Workflow state", ""]}>
             {listQ.data.map((a: Assessment) => (
               <tr key={a.id}>
                 <td>{subjectName(a.subject_id)}</td>
@@ -267,6 +281,15 @@ function AssessmentsPageInner() {
                 <td>{className(a.class_id)}</td>
                 <td>
                   <span className={`state-badge state-${a.workflow_state}`}>{a.workflow_state}</span>
+                </td>
+                <td>
+                  <a href={`/assessments/${a.id}/sheet`}>
+                    {a.workflow_state === "draft" || a.workflow_state === "returned"
+                      ? "Enter scores"
+                      : a.workflow_state === "submitted" || a.workflow_state === "under_review"
+                        ? "Review"
+                        : "Open"}
+                  </a>
                 </td>
               </tr>
             ))}

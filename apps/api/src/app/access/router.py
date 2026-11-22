@@ -12,6 +12,8 @@ roles, which additionally require roles.manage (otherwise a users.edit holder
 could mint themselves full power, a privilege-escalation hole).
 """
 
+# ruff: noqa: B008  — Depends(require(...)) in defaults is the FastAPI idiom.
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status

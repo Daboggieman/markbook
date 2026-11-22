@@ -212,6 +212,7 @@ class AssessmentService:
         term_id: UUID | None = None,
         class_id: UUID | None = None,
         subject_id: UUID | None = None,
+        workflow_state: str | None = None,
     ) -> list[Assessment]:
         """`school` scope lists everything; `assigned` narrows to the actor's
         teacher assignments (spec §7.2); `own` makes no sense for assessments
@@ -222,12 +223,17 @@ class AssessmentService:
                 term_id=term_id,
                 class_id=class_id,
                 subject_id=subject_id,
+                workflow_state=workflow_state,
                 teacher_user_id=actor.user_id,
             )
         if scope != "school":
             raise ProblemError(PERMISSION_DENIED, "assessments.view requires school or assigned")
         return await self._repo.list_assessments(
-            school_id, term_id=term_id, class_id=class_id, subject_id=subject_id
+            school_id,
+            term_id=term_id,
+            class_id=class_id,
+            subject_id=subject_id,
+            workflow_state=workflow_state,
         )
 
     # ---- score sheet -----------------------------------------------------------

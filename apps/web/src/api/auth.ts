@@ -41,3 +41,35 @@ export async function fetchProfile(): Promise<Profile | null> {
   const { data } = await api.GET("/api/v1/auth/users/me", {});
   return data ?? null;
 }
+
+export interface ReauthResult {
+  ok: boolean;
+  /** "MFA_REQUIRED" when the account needs an authenticator code. */
+  code?: string;
+  detail?: string;
+}
+
+/**
+ * Step-up credential check (spec §7.1). On success the NEW access token
+ * (same session, carrying the reauth_at claim) replaces the current one —
+ * the follow-up sensitive call goes out with it via authedFetch.
+ *
+ * Call it without a code first: a 401 MFA_REQUIRED tells you the account
+ * has TOTP enrolled, and the dialog reveals the code field. No profile
+ * round-trip needed to learn that.
+ */
+export async function reauth(password: string, totpCode?: string): Promise<ReauthResult> {
+  const { data, error } = await api.POST("/api/v1/auth/reauth", {
+    body: totpCode ? { password, totp_code: totpCode } : { password },
+  });
+  if (error || !data) {
+    const problem = error as { code?: string; detail?: string } | null;
+    return {
+      ok: false,
+      code: problem?.code,
+      detail: problem?.detail ?? "Re-authentication failed",
+    };
+  }
+  tokens.access = data.access_token;
+  return { ok: true };
+}

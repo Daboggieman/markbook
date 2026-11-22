@@ -16,7 +16,7 @@
 | 3 — Assessment templates and score entry | ✅ **COMPLETE** | 2026-11-06 | All exit criteria verified live: full suite **125 passed** (incl. 42 testcontainer tests), ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 4 — Calculation engine and processing | ✅ **COMPLETE** | 2026-11-11 | All exit criteria verified live: full suite **193 passed** (incl. 77 testcontainer-gated tests), coverage on `app.grading` **96%**, ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
 | 5 — Workflow, locking, publication, documents | ✅ **COMPLETE** | 2026-11-13 | All exit criteria verified live: full suite **243 passed** (exit 0), coverage grading **96%** / access **99%** / workflow **96%**, ruff/mypy/import-linter clean — see [`09-phase-acceptance.md`](09-phase-acceptance.md) |
-| 6 — Web client | 🚧 **In progress** | started 2026-11-16 | Scaffold + generated API client + auth flow + shell landed (`ad803a7`…`0f08060`); admin screens being built |
+| 6 — Web client | 🚧 **In progress** | started 2026-11-16 | Scaffold + generated API client + auth flow + shell landed (`ad803a7`…`0f08060`); admin screens built (users/roles incl. the new access router, academic, students, assessments); **score sheet landed 2026-11-22** (keyboard grid, m/a/e statuses, conflict dialog, 7 component tests); remaining: review/approval screens, reports, Playwright E2E |
 | 7 — Desktop client and sync | not started | — | |
 | 8 — Hardening and pilot | not started | — | |
 

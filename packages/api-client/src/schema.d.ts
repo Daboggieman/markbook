@@ -219,6 +219,110 @@ export interface paths {
         patch: operations["change_user_status_api_v1_auth_users__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Roles
+         * @description Roles for the actor's school, each with its permission grants.
+         */
+        get: operations["list_roles_api_v1_roles_get"];
+        put?: never;
+        /**
+         * Create Role
+         * @description Create a role, optionally with initial (code, scope) grants.
+         */
+        post: operations["create_role_api_v1_roles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/roles/{role_id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assign Role Permissions
+         * @description Attach (or re-scope) permission codes on a role, one scope for all.
+         */
+        post: operations["assign_role_permissions_api_v1_roles__role_id__permissions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Permissions
+         * @description The global catalogue seeded at migration time — codes never mutate.
+         */
+        get: operations["list_permissions_api_v1_permissions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assign Role To User
+         * @description Grant a role to a user. Super-admin roles additionally need roles.manage.
+         */
+        post: operations["assign_role_to_user_api_v1_users__user_id__roles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/roles/{role_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Role From User
+         * @description Revoke one role grant.
+         */
+        delete: operations["revoke_role_from_user_api_v1_users__user_id__roles__role_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students": {
         parameters: {
             query?: never;
@@ -606,7 +710,8 @@ export interface paths {
         /**
          * List Assessments
          * @description Scope-filtered (spec §7.2): 'assigned' callers see only assessments
-         *     covered by their teacher assignments.
+         *     covered by their teacher assignments. `workflow_state` is the review
+         *     queue's filter (Phase 6 — reviewers list submitted/under_review).
          */
         get: operations["list_assessments_api_v1_assessments_get"];
         put?: never;
@@ -1655,6 +1760,13 @@ export interface components {
             /** Totp Code */
             totp_code: string;
         };
+        /** PermissionResponse */
+        PermissionResponse: {
+            /** Code */
+            code: string;
+            /** Description */
+            description: string | null;
+        };
         /**
          * ProcessRequest
          * @description Recalculation is explicit: the body names the scheme VERSION to use
@@ -1811,6 +1923,31 @@ export interface components {
             run: components["schemas"]["RunResponse"];
             /** Results */
             results: components["schemas"]["ProcessedResultResponse"][];
+        };
+        /** RoleCreate */
+        RoleCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Permission Ids
+             * @default []
+             */
+            permission_ids: [
+                string,
+                string
+            ][];
+        };
+        /** RolePermissionAssign */
+        RolePermissionAssign: {
+            /** Permission Codes */
+            permission_codes: string[];
+            /**
+             * Scope Type
+             * @default school
+             */
+            scope_type: string;
         };
         /** RoleWithPermissions */
         RoleWithPermissions: {
@@ -2586,6 +2723,14 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** UserRoleAssign */
+        UserRoleAssign: {
+            /**
+             * Role Id
+             * Format: uuid
+             */
+            role_id: string;
+        };
         /** UserStatusUpdate */
         UserStatusUpdate: {
             /** Status */
@@ -2906,6 +3051,185 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_roles_api_v1_roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleWithPermissions"][];
+                };
+            };
+        };
+    };
+    create_role_api_v1_roles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleWithPermissions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_role_permissions_api_v1_roles__role_id__permissions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolePermissionAssign"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleWithPermissions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_permissions_api_v1_permissions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionResponse"][];
+                };
+            };
+        };
+    };
+    assign_role_to_user_api_v1_users__user_id__roles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserRoleAssign"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_role_from_user_api_v1_users__user_id__roles__role_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -3891,6 +4215,7 @@ export interface operations {
                 term_id?: string | null;
                 class_id?: string | null;
                 subject_id?: string | null;
+                workflow_state?: string | null;
             };
             header?: never;
             path?: never;

@@ -41,7 +41,8 @@ from app.platform.errors import (
 )
 
 # Argon2id password hashing (spec §7.1); parameters come from config.
-_pwd_context: "PasswordContext" | None = None
+# Declared AFTER the PasswordContext class: a module-level forward reference
+# (`"PasswordContext" | None`) evaluates eagerly on Python ≤3.12 and raises.
 
 
 class PasswordContext:
@@ -71,11 +72,14 @@ class PasswordContext:
         return self._ctx.needs_update(password_hash)
 
 
-def _password_context() -> "PasswordContext":
+_pwd_context: PasswordContext | None = None
+
+
+def _password_context() -> PasswordContext:
     global _pwd_context
     if _pwd_context is None:
-        _pwd_context = PasswordContext()  # type: ignore[assignment]
-    return _pwd_context  # type: ignore[return-value]
+        _pwd_context = PasswordContext()
+    return _pwd_context
 
 
 def hash_password(password: str) -> str:

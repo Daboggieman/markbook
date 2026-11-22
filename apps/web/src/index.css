@@ -194,3 +194,95 @@ button:disabled {
 .data-table th:last-child {
   text-align: right;
 }
+
+/* --- score sheet --- */
+
+.hint {
+  color: rgba(128, 128, 128, 0.9);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.score-grid td {
+  padding: 0.15rem 0.4rem;
+}
+
+.score-grid input.cell {
+  width: 4.5rem;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 4px;
+  text-align: right;
+}
+
+.score-grid input.cell:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: -1px;
+}
+
+.score-grid input.cell-missing,
+.score-grid input.cell-absent,
+.score-grid input.cell-exempt {
+  text-transform: uppercase;
+  font-weight: 600;
+  color: rgba(128, 128, 128, 0.95);
+  background: rgba(128, 128, 128, 0.08);
+}
+
+.score-grid input.cell-over {
+  border-color: #b91c1c;
+  background: rgba(185, 28, 28, 0.08);
+}
+
+.score-grid input.cell-dirty {
+  border-color: rgba(59, 130, 246, 0.7);
+}
+
+.score-grid .max {
+  font-weight: 400;
+  color: rgba(128, 128, 128, 0.8);
+  font-size: 0.8rem;
+}
+
+.conflict-dialog {
+  border: 1px solid #d97706;
+  background: rgba(217, 119, 6, 0.08);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* --- workflow bar --- */
+
+.workflow-bar {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+  padding-top: 0.75rem;
+}
+
+.workflow-bar .inline-form {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: end;
+  width: 100%;
+}
+
+.workflow-bar .reason-field input {
+  width: 22rem;
+}
+
+.step-up {
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}

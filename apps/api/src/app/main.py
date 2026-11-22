@@ -6,9 +6,9 @@ Exits:
   - OpenAPI served at /openapi.json (FastAPI default)
 """
 
-from contextlib import asynccontextmanager
 import asyncio
 import sys
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -121,8 +121,8 @@ def create_app() -> FastAPI:
     # Import and include routers here. Phase 2 adds people and academic;
     # Phase 3 adds assessment; Phase 4 adds grading; Phase 5 adds workflow
     # and documents.
-    from app.access.router import router as access_router
     from app.academic.router import router as academic_router
+    from app.access.router import router as access_router
     from app.assessment.router import router as assessment_router
     from app.documents.router import router as documents_router
     from app.grading.router import router as grading_router

@@ -149,6 +149,7 @@ class AssessmentRepository:
         term_id: UUID | None = None,
         class_id: UUID | None = None,
         subject_id: UUID | None = None,
+        workflow_state: str | None = None,
         teacher_user_id: UUID | None = None,
     ) -> list[Assessment]:
         """Assessments for the school, newest first.
@@ -165,6 +166,8 @@ class AssessmentRepository:
             stmt = stmt.where(Assessment.class_id == class_id)
         if subject_id is not None:
             stmt = stmt.where(Assessment.subject_id == subject_id)
+        if workflow_state is not None:
+            stmt = stmt.where(Assessment.workflow_state == workflow_state)
         if teacher_user_id is not None:
             stmt = stmt.where(
                 select(TeacherAssignment.id)

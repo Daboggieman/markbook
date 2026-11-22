@@ -8,7 +8,7 @@ matrix (401 without a token, 403 without the permission, 422 unknown codes,
 403 super-admin escalation).
 """
 
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -22,17 +22,12 @@ USER_SQL = (
     "is_super_admin, status, token_version, failed_login_count) "
     "VALUES (:id, :s, :email, :u, :pw, :sa, 'active', 1, 0)"
 )
-ROLE_SQL = (
-    "INSERT INTO roles (id, school_id, name, is_super_admin) "
-    "VALUES (:i, :s, :n, :sa)"
-)
+ROLE_SQL = "INSERT INTO roles (id, school_id, name, is_super_admin) VALUES (:i, :s, :n, :sa)"
 GRANT_SQL = (
-    "INSERT INTO role_permissions (role_id, permission_code, scope_type) "
-    "VALUES (:r, :p, :sc)"
+    "INSERT INTO role_permissions (role_id, permission_code, scope_type) VALUES (:r, :p, :sc)"
 )
 USER_ROLE_SQL = (
-    "INSERT INTO user_roles (user_id, role_id, school_id, granted_by) "
-    "VALUES (:u, :r, :s, NULL)"
+    "INSERT INTO user_roles (user_id, role_id, school_id, granted_by) VALUES (:u, :r, :s, NULL)"
 )
 
 
@@ -49,7 +44,9 @@ def _authed_app(monkeypatch, url: str):
     from app.platform import db as platform_db
 
     engine = create_async_engine(url)
-    monkeypatch.setattr(platform_db, "_sessionmaker", async_sessionmaker(engine, expire_on_commit=False))
+    monkeypatch.setattr(
+        platform_db, "_sessionmaker", async_sessionmaker(engine, expire_on_commit=False)
+    )
     app = create_app()
     return app, engine
 
@@ -64,12 +61,32 @@ class TestRolesLifecycle:
         await _seed(
             migrated_url,
             [
-                ("INSERT INTO schools (id, name) VALUES (:i, :n) ON CONFLICT (id) DO NOTHING",
-                 {"i": school, "n": "RolesApi"}),
-                (USER_SQL, {"id": admin, "s": school, "email": "admin@roles.local",
-                            "u": "roles_admin", "pw": "x", "sa": False}),
-                (USER_SQL, {"id": user2, "s": school, "email": "u2@roles.local",
-                            "u": "roles_u2", "pw": "x", "sa": False}),
+                (
+                    "INSERT INTO schools (id, name) VALUES (:i, :n) ON CONFLICT (id) DO NOTHING",
+                    {"i": school, "n": "RolesApi"},
+                ),
+                (
+                    USER_SQL,
+                    {
+                        "id": admin,
+                        "s": school,
+                        "email": "admin@roles.local",
+                        "u": "roles_admin",
+                        "pw": "x",
+                        "sa": False,
+                    },
+                ),
+                (
+                    USER_SQL,
+                    {
+                        "id": user2,
+                        "s": school,
+                        "email": "u2@roles.local",
+                        "u": "roles_u2",
+                        "pw": "x",
+                        "sa": False,
+                    },
+                ),
                 (ROLE_SQL, {"i": role, "s": school, "n": "Clerk", "sa": False}),
                 (GRANT_SQL, {"r": role, "p": "roles.view", "sc": "school"}),
                 (GRANT_SQL, {"r": role, "p": "roles.manage", "sc": "school"}),
@@ -92,8 +109,11 @@ class TestRolesLifecycle:
             r = await c.post(
                 "/api/v1/roles",
                 headers=headers,
-                json={"name": "Form Master", "description": "watches a form",
-                      "permission_ids": [["students.view", "school"]]},
+                json={
+                    "name": "Form Master",
+                    "description": "watches a form",
+                    "permission_ids": [["students.view", "school"]],
+                },
             )
             assert r.status_code == 201, r.text
             form_master = r.json()
@@ -111,9 +131,7 @@ class TestRolesLifecycle:
                 json={"permission_codes": ["students.view"], "scope_type": "assigned"},
             )
             assert r.status_code == 200, r.text
-            assert r.json()["permissions"] == [
-                {"code": "students.view", "scope_type": "assigned"}
-            ]
+            assert r.json()["permissions"] == [{"code": "students.view", "scope_type": "assigned"}]
 
             # grant the role to user2 — their /me now carries the permission
             r = await c.post(
@@ -123,28 +141,23 @@ class TestRolesLifecycle:
             token2, _ = create_access_token(
                 user_id=user2, school_id=school, token_version=1, session_id=uuid4()
             )
-            r = await c.get(
-                "/api/v1/auth/users/me", headers={"Authorization": f"Bearer {token2}"}
-            )
+            r = await c.get("/api/v1/auth/users/me", headers={"Authorization": f"Bearer {token2}"})
             assert r.status_code == 200, r.text
             assert ("students.view", "assigned") in [
                 (p["code"], p["scope_type"]) for p in r.json()["effective_permissions"]
             ]
 
             # revoke — the permission is gone again
-            r = await c.delete(
-                f"/api/v1/users/{user2}/roles/{form_master['id']}", headers=headers
-            )
+            r = await c.delete(f"/api/v1/users/{user2}/roles/{form_master['id']}", headers=headers)
             assert r.status_code == 200, r.text
             assert r.json()["removed"] is True
-            r = await c.get(
-                "/api/v1/auth/users/me", headers={"Authorization": f"Bearer {token2}"}
-            )
+            r = await c.get("/api/v1/auth/users/me", headers={"Authorization": f"Bearer {token2}"})
             assert r.json()["effective_permissions"] == []
 
             # validation: unknown permission code → 422, not an FK 500
             r = await c.post(
-                "/api/v1/roles", headers=headers,
+                "/api/v1/roles",
+                headers=headers,
                 json={"name": "Broken", "permission_ids": [["not_a_code", "school"]]},
             )
             assert r.status_code == 422, r.text
@@ -155,14 +168,25 @@ class TestRolesLifecycle:
         """401 without a token; 403 without the permission; granting a
         super-admin role needs roles.manage beyond users.edit."""
         app, engine = _authed_app(monkeypatch, migrated_url)
-        school, user, sa_role = uuid4(), uuid4(), uuid4()
+        school, user, sa_role, edit_role = uuid4(), uuid4(), uuid4(), uuid4()
         await _seed(
             migrated_url,
             [
-                ("INSERT INTO schools (id, name) VALUES (:i, :n) ON CONFLICT (id) DO NOTHING",
-                 {"i": school, "n": "RolesGate"}),
-                (USER_SQL, {"id": user, "s": school, "email": "g@roles.local",
-                            "u": "g_user", "pw": "x", "sa": False}),
+                (
+                    "INSERT INTO schools (id, name) VALUES (:i, :n) ON CONFLICT (id) DO NOTHING",
+                    {"i": school, "n": "RolesGate"},
+                ),
+                (
+                    USER_SQL,
+                    {
+                        "id": user,
+                        "s": school,
+                        "email": "g@roles.local",
+                        "u": "g_user",
+                        "pw": "x",
+                        "sa": False,
+                    },
+                ),
                 (ROLE_SQL, {"i": sa_role, "s": school, "n": "Big Admin", "sa": True}),
             ],
         )
