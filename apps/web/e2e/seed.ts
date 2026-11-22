@@ -110,6 +110,10 @@ export interface SeededWorld {
 export async function seedAssessmentWorld(): Promise<SeededWorld> {
   await loginAs(ADMIN.email, ADMIN.password);
 
+  // Fresh session per run — the downstream chain (term, enrolments,
+  // assessment) hangs off it, so repeated walks never collide.
+  const sessionName = `E2E ${new Date().toISOString().replace("T", " ").slice(0, 19)}`;
+
   const teacherId = await ensureUser(TEACHER.email, TEACHER.password);
   const reviewerId = await ensureUser(REVIEWER.email, REVIEWER.password);
   const teacherRole = await ensureRoleWith("E2E Teacher", [["scores.enter", "assigned"]]);
@@ -121,19 +125,24 @@ export async function seedAssessmentWorld(): Promise<SeededWorld> {
   await call("POST", `/api/v1/users/${reviewerId}/roles`, { role_id: reviewerRole });
 
   // template + version (unique name → idempotent via 409 skip + list lookup)
-  const tRes = await call("POST", "/api/v1/assessment-templates", {
-    name: "E2E Template",
+  const definition = {
     components: [
       { key: "CA1", label: "First CA", max_score: "10.00", weight: "10", required: true },
       { key: "Exam", label: "Exam", max_score: "60.00", weight: "60", required: true },
     ],
+  };
+  const tRes = await call("POST", "/api/v1/assessment-templates", {
+    name: "E2E Template",
+    definition,
   });
   let versionId: string;
   if (tRes.status === 201) {
     const t = (await tRes.json()) as { id: string };
-    const vRes = await call("POST", `/api/v1/assessment-templates/${t.id}/versions`, {});
+    const vRes = await call("POST", `/api/v1/assessment-templates/${t.id}/versions`, {
+      definition,
+    });
     const v = (await vRes.json()) as { id: string };
-    await call("POST", `/api/v1/assessment-templates/${t.id}/versions/${v.id}/activate`, {});
+    await call("POST", `/api/v1/template-versions/${v.id}/activate`, {});
     versionId = v.id;
   } else {
     const templates = (await (await call("GET", "/api/v1/assessment-templates")).json()) as {
@@ -150,39 +159,101 @@ export async function seedAssessmentWorld(): Promise<SeededWorld> {
     versionId = active.id;
   }
 
-  // academic structure + students are seeded by migrations (Seed School);
-  // reuse its single class + subject via the reference lists
+  // --- academic structure: fresh SESSION per run → everything downstream
+  // (term, assessment) is new each run, so the walk is rerun-safe; the
+  // class/subject/template are shared and found-or-created.
   const classes = (await (await call("GET", "/api/v1/classes")).json()) as { id: string }[];
-  const subjects = (await (await call("GET", "/api/v1/subjects")).json()) as { id: string }[];
   const classId = classes[0]!.id;
-  const subjectId = subjects[0]!.id;
-  const sessions = (await (await call("GET", "/api/v1/academic-sessions")).json()) as {
+
+  async function findOrCreate<T>(
+    listPath: string,
+    match: (x: T) => boolean,
+    create: () => Promise<Response>,
+  ): Promise<T> {
+    const existing = (await (await call("GET", listPath)).json()) as T[];
+    const found = existing.find(match);
+    if (found) return found;
+    const res = await create();
+    if (res.status !== 201) throw new Error(`create failed: ${listPath} → ${res.status}`);
+    return (await res.json()) as T;
+  }
+
+  const session = await findOrCreate<{ id: string; name: string }>(
+    "/api/v1/academic-sessions",
+    (s) => s.name === sessionName,
+    () => call("POST", "/api/v1/academic-sessions", { name: sessionName, is_current: true }),
+  );
+  const term = await findOrCreate<{ id: string; name: string }>(
+    `/api/v1/terms?session_id=${session.id}`,
+    (t) => t.name === "First Term",
+    () =>
+      call("POST", "/api/v1/terms", {
+        session_id: session.id,
+        name: "First Term",
+        ordinal: 1,
+        is_current: true,
+      }),
+  );
+  const subject = await findOrCreate<{ id: string; name: string }>(
+    "/api/v1/subjects",
+    (s) => s.name === "E2E Subject",
+    () => call("POST", "/api/v1/subjects", { name: "E2E Subject", code: "E2E" }),
+  );
+  await findOrCreate<{ id: string; subject_id: string }>(
+    `/api/v1/class-subjects?class_id=${classId}`,
+    (cs) => cs.subject_id === subject.id,
+    () => call("POST", "/api/v1/class-subjects", { class_id: classId, subject_id: subject.id }),
+  );
+
+  // three students (shared across runs), enrolled into the fresh session —
+  // enrol_student creates one subject_enrolment per class subject
+  const allStudents = (await (await call("GET", "/api/v1/students?limit=200")).json()) as {
     id: string;
+    admission_no: string | null;
   }[];
-  const terms = (await (
-    await call("GET", "/api/v1/terms", { session_id: sessions[0]!.id })
-  ).json()) as { id: string }[];
-  const termId = terms[0]!.id;
+  const studentIds: string[] = [];
+  for (const [first, adm] of [
+    ["Ada", "E2E-ADA"],
+    ["Bayo", "E2E-BAYO"],
+    ["Chidi", "E2E-CHIDI"],
+  ] as const) {
+    const existing = allStudents.find((s) => s.admission_no === adm);
+    const studentId =
+      existing?.id ??
+      (await (async () => {
+        const res = await call("POST", "/api/v1/students", {
+          first_name: first,
+          last_name: "E2E",
+          admission_no: adm,
+        });
+        if (res.status !== 201) throw new Error(`student create failed: ${res.status}`);
+        return ((await res.json()) as { id: string }).id;
+      })());
+    await call("POST", "/api/v1/enrolments", {
+      student_id: studentId,
+      session_id: session.id,
+      class_id: classId,
+    }); // 409 on re-run within the same session — fine either way
+    studentIds.push(studentId);
+  }
+
+  // the teacher's assigned-scope cover (scores.enter/submit re-check this)
+  await call("POST", "/api/v1/teacher-assignments", {
+    teacher_user_id: teacherId,
+    session_id: session.id,
+    class_id: classId,
+    subject_id: subject.id,
+    role: "subject",
+  });
 
   const aRes = await call("POST", "/api/v1/assessments", {
-    term_id: termId,
+    term_id: term.id,
     class_id: classId,
-    subject_id: subjectId,
+    subject_id: subject.id,
     template_version_id: versionId,
   });
-  let assessmentId: string;
-  if (aRes.status === 201) {
-    assessmentId = ((await aRes.json()) as { id: string }).id;
-  } else {
-    const list = (await (await call("GET", "/api/v1/assessments", { class_id: classId })).json()) as {
-      id: string;
-      term_id: string;
-      subject_id: string;
-    }[];
-    const found = list.find((a) => a.term_id === termId && a.subject_id === subjectId);
-    if (!found) throw new Error("assessment neither created nor found");
-    assessmentId = found.id;
-  }
+  if (aRes.status !== 201) throw new Error(`assessment create failed: ${aRes.status}`);
+  const assessmentId = ((await aRes.json()) as { id: string }).id;
 
   // the sheet: enter every cell as the TEACHER (assigned scope path)
   await loginAs(TEACHER.email, TEACHER.password);

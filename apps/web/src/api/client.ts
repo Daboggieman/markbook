@@ -15,7 +15,6 @@ import { createClient, type paths } from "@markbook/api-client";
 export const API_BASE_URL: string =
   (import.meta.env?.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8001";
 
-const ACCESS_KEY = "markbook.access";
 const REFRESH_KEY = "markbook.refresh";
 
 const store = {
@@ -36,13 +35,16 @@ const store = {
   },
 };
 
-/** Session tokens. Access is mirrored here for the in-memory-only rule. */
+/** The access token lives in a module variable — genuinely in memory. */
+let accessToken: string | null = null;
+
+/** Session tokens. Access stays in memory; only the refresh token persists. */
 export const tokens = {
   get access(): string | null {
-    return store.get(ACCESS_KEY);
+    return accessToken;
   },
   set access(v: string | null) {
-    store.set(ACCESS_KEY, v);
+    accessToken = v;
   },
   get refresh(): string | null {
     return store.get(REFRESH_KEY);
@@ -51,7 +53,7 @@ export const tokens = {
     store.set(REFRESH_KEY, v);
   },
   clear(): void {
-    store.set(ACCESS_KEY, null);
+    accessToken = null;
     store.set(REFRESH_KEY, null);
   },
 };

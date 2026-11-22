@@ -25,9 +25,12 @@ export function ReportsPage() {
   const canTranscript = hasPermission(profile, "transcripts.generate");
 
   const publishedQ = useApiQuery(async () => {
+    // Gated here, not by the early return below: hooks run before any
+    // render gate, and a no-permission page must not fire requests.
+    if (!canReport) return [] as Assessment[];
     const all = await unwrap(api.GET("/api/v1/assessments", {}));
     return all.filter((a: Assessment) => a.workflow_state === "published");
-  }, []);
+  }, [canReport]);
   const [assessmentId, setAssessmentId] = useState("");
   const docsQ = useApiQuery(
     () =>

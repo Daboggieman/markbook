@@ -9,5 +9,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    // Playwright owns the e2e dir; vitest only runs component tests.
+    exclude: ["**/node_modules/**", "e2e/**"],
   },
 });

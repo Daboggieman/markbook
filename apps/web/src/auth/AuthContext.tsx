@@ -7,7 +7,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 import { fetchProfile, login as apiLogin, logout as apiLogout, type Profile } from "../api/auth";
-import { tokens } from "../api/client";
+import { refreshAccessToken, tokens } from "../api/client";
 
 export interface AuthState {
   profile: Profile | null;
@@ -27,11 +27,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // A persisted refresh token means a page reload mid-session: mint a
-      // fresh access token, then load the profile. Any failure → signed out.
+      // A persisted refresh token means a page reload mid-session: the
+      // access token lives only in memory, so mint a fresh one from the
+      // refresh FIRST (the 401 interceptor can't do it — it only fires
+      // when an access token was already attached), then load the profile.
       if (tokens.refresh) {
-        const p = await fetchProfile();
-        if (!cancelled) setProfile(p);
+        const minted = await refreshAccessToken();
+        if (minted) {
+          const p = await fetchProfile();
+          if (!cancelled) setProfile(p);
+        } else {
+          tokens.clear(); // dead refresh family — sign out cleanly
+        }
       }
       if (!cancelled) setBooting(false);
     })();
