@@ -86,7 +86,17 @@ export function WorkflowBar({
             />
           )
         ) : (
-          <button key={spec.action} type="button" disabled={busy} onClick={() => setActive(spec)}>
+          <button
+            key={spec.action}
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              // reason-none, no step-up → fire on click; anything that
+              // needs input goes through the inline form first
+              if (spec.reason === "none" && !spec.stepUp) void fireTransition(spec);
+              else setActive(spec);
+            }}
+          >
             {spec.label}
           </button>
         ),

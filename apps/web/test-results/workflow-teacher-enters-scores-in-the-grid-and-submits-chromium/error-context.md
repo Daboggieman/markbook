@@ -12,28 +12,62 @@
 # Error details
 
 ```
-Test timeout of 30000ms exceeded.
-```
+Error: expect(locator).toBeVisible() failed
 
-```
-Error: locator.fill: Test timeout of 30000ms exceeded.
+Locator: getByText('submitted', { exact: true })
+Expected: visible
+Timeout: 5000ms
+Error: element(s) not found
+
 Call log:
-  - waiting for getByLabel(/Ada E2E First CA/)
+  - Expect "toBeVisible" getByText('submitted', { exact: true }) with timeout 5000ms
+  - waiting for getByText('submitted', { exact: true })
 
 ```
-
-# Page snapshot
 
 ```yaml
-- generic [ref=f1e3]:
-  - heading "Markbook" [level=1] [ref=f1e4]
-  - generic [ref=f1e5]:
-    - text: Email
-    - textbox "Email" [ref=f1e6]
-  - generic [ref=f1e7]:
-    - text: Password
-    - textbox "Password" [ref=f1e8]
-  - button "Sign in" [ref=f1e9] [cursor=pointer]
+- navigation "Main":
+  - list:
+    - listitem:
+      - link "Dashboard":
+        - /url: /
+    - listitem:
+      - link "Assessments":
+        - /url: /assessments
+- main:
+  - paragraph: e2e-teacher · e2e-teacher@seed.school
+  - button "Sign out"
+  - heading "Score sheet draft" [level=2]
+  - paragraph: Type scores; m = missing, a = absent, e = exempt. Enter/↓ next student, ↑ back, Tab next column.
+  - heading "3 students" [level=3]
+  - table:
+    - rowgroup:
+      - row "Student First CA /10 Exam /60":
+        - columnheader "Student"
+        - columnheader "First CA /10"
+        - columnheader "Exam /60"
+    - rowgroup:
+      - row "Ada E2E 9 28.00":
+        - cell "Ada E2E"
+        - cell "9":
+          - textbox "Ada E2E First CA": "9"
+        - cell "28.00":
+          - textbox "Ada E2E Exam": "28.00"
+      - row "Bayo E2E 8.008 28.00":
+        - cell "Bayo E2E"
+        - cell "8.008":
+          - textbox "Bayo E2E First CA": "8.008"
+        - cell "28.00":
+          - textbox "Bayo E2E Exam": "28.00"
+      - row "Chidi E2E 8.00 28.00":
+        - cell "Chidi E2E"
+        - cell "8.00":
+          - textbox "Chidi E2E First CA": "8.00"
+        - cell "28.00":
+          - textbox "Chidi E2E Exam": "28.00"
+  - button "Save 2 changes"
+  - region "Workflow actions":
+    - button "Submit for review"
 ```
 
 # Test source
@@ -82,15 +116,15 @@ Call log:
   41 |   await page.goto(`/assessments/${world.assessmentId}/sheet`);
   42 |   // keyboard entry: focus the first CA1 cell, type, Enter walks down
   43 |   const firstCell = page.getByLabel(new RegExp(`${world.rows[0]!.student_name} First CA`));
-> 44 |   await firstCell.fill("9");
-     |                   ^ Error: locator.fill: Test timeout of 30000ms exceeded.
+  44 |   await firstCell.fill("9");
   45 |   await firstCell.press("Enter");
   46 |   await expect(page.getByLabel(new RegExp(`${world.rows[1]!.student_name} First CA`))).toBeFocused();
   47 |   await page.keyboard.type("8");
   48 |   await page.getByRole("button", { name: /Save \d+ change/ }).click();
   49 |   await expect(page.getByRole("button", { name: "Submit for review" })).toBeVisible();
   50 |   await page.getByRole("button", { name: "Submit for review" }).click();
-  51 |   await expect(page.getByText("submitted", { exact: true })).toBeVisible();
+> 51 |   await expect(page.getByText("submitted", { exact: true })).toBeVisible();
+     |                                                              ^ Error: expect(locator).toBeVisible() failed
   52 | });
   53 | 
   54 | test("reviewer starts the review; admin approves and locks with step-up", async ({ page }) => {

@@ -39,12 +39,14 @@ test("teacher enters scores in the grid and submits", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 
   await page.goto(`/assessments/${world.assessmentId}/sheet`);
-  // keyboard entry: focus the first CA1 cell, type, Enter walks down
+  // keyboard entry: focus the first CA1 cell, replace its value, Enter walks
+  // down (fill() replaces — keyboard.type would append to the seeded value)
   const firstCell = page.getByLabel(new RegExp(`${world.rows[0]!.student_name} First CA`));
   await firstCell.fill("9");
   await firstCell.press("Enter");
-  await expect(page.getByLabel(new RegExp(`${world.rows[1]!.student_name} First CA`))).toBeFocused();
-  await page.keyboard.type("8");
+  const secondCell = page.getByLabel(new RegExp(`${world.rows[1]!.student_name} First CA`));
+  await expect(secondCell).toBeFocused();
+  await secondCell.fill("8");
   await page.getByRole("button", { name: /Save \d+ change/ }).click();
   await expect(page.getByRole("button", { name: "Submit for review" })).toBeVisible();
   await page.getByRole("button", { name: "Submit for review" }).click();

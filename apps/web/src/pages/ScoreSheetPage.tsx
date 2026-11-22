@@ -17,7 +17,7 @@
  * re-validates authoritatively (rules-package rule: UI never gates).
  */
 import type { components } from "@markbook/api-client";
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useParams } from "react-router";
 
 import { api } from "../api/client";
@@ -87,11 +87,12 @@ export function ScoreSheetPage() {
   const [conflict, setConflict] = useState(false);
   const cellRefs = useRef(new Map<string, HTMLInputElement>());
 
-  // The edit buffer seeds from each load; after a save the sheet reloads
-  // and the buffer re-seeds with the fresh versions.
-  const seedKey = `${sheet?.assessment_id ?? ""}:${sheet?.rows.map((r) => r.subject_enrolment_id).join(",") ?? ""}`;
-  const [seededFor, setSeededFor] = useState("");
-  if (sheet && seededFor !== seedKey) {
+  // The edit buffer re-seeds on EVERY sheet load — a new `sheet` object
+  // arrives after each save's reload, and the fresh versions (bumped by the
+  // commit) must become the buffer's base_versions. Keying off data that
+  // survives reloads (ids) would keep saved cells reading as dirty.
+  useEffect(() => {
+    if (!sheet) return;
     const seeded: Record<string, CellEdit> = {};
     for (const row of sheet.rows) {
       for (const c of sheet.components) {
@@ -99,8 +100,7 @@ export function ScoreSheetPage() {
       }
     }
     setEdits(seeded);
-    setSeededFor(seedKey);
-  }
+  }, [sheet]);
 
   const editable = sheet !== null && EDITABLE_STATES.has(sheet.workflow_state) && canEnter;
 
