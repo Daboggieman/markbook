@@ -39,6 +39,7 @@ from app.academic.models import (
 from app.access.service import Actor
 from app.assessment.models import Assessment
 from app.audit.service import AuditService
+from app.documents import schemas
 from app.documents.render import render_result_document_html
 from app.documents.storage import checksum_of
 from app.grading.models import ProcessedResult, ResultProcessingRun
@@ -264,6 +265,43 @@ class DocumentService:
             "skipped": 0 if document is not None else 1,
             "document_ids": [str(document.id)] if document is not None else [],
         }
+
+    # ---- API side: listing (Phase 6 reports screen) --------------------------------
+
+    async def list_for_assessment(
+        self, school_id: UUID, assessment_id: UUID
+    ) -> list[schemas.DocumentListItem]:
+        """Published documents for one assessment, student-named via the
+        enrolment join, versions ascending. Read-only surface over the
+        INSERT-only published_documents table."""
+        rows = await self._s.execute(
+            select(
+                PublishedDocument,
+                Student.first_name,
+                Student.last_name,
+            )
+            .join(SubjectEnrolment, SubjectEnrolment.id == PublishedDocument.enrolment_id)
+            .join(Enrolment, Enrolment.id == SubjectEnrolment.enrolment_id)
+            .join(Student, Student.id == Enrolment.student_id)
+            .where(
+                PublishedDocument.school_id == school_id,
+                PublishedDocument.assessment_id == assessment_id,
+            )
+            .order_by(Student.first_name, Student.last_name, PublishedDocument.doc_version)
+        )
+        return [
+            schemas.DocumentListItem(
+                id=doc.id,
+                kind=str(doc.kind),
+                doc_version=doc.doc_version,
+                enrolment_id=doc.enrolment_id,
+                student_name=f"{first} {last}",
+                supersedes_id=doc.supersedes_id,
+                correction_reason=doc.correction_reason,
+                published_at=doc.published_at,
+            )
+            for doc, first, last in rows
+        ]
 
     # ---- internals -----------------------------------------------------------------
 

@@ -992,6 +992,40 @@ class TestDocuments:
         )
         assert count == 3
 
+    async def test_list_documents_per_assessment_with_names_and_download(
+        self, world, monkeypatch
+    ) -> None:
+        """The Phase 6 reports screen's read: GET /documents/assessment/{id}
+        returns student-named rows (versions ascending) whose ids round-trip
+        into the audited download endpoint."""
+        w = world
+        jobs = await _drive_to(w, "published")
+        await _run_doc_worker(monkeypatch, w, jobs["report_cards"])
+
+        r = await w.client.get(
+            f"/api/v1/documents/assessment/{w.assessment_id}",
+            headers=w.auth(w.token("registrar")),
+        )
+        assert r.status_code == 200, r.text
+        rows = r.json()
+        assert len(rows) == 3
+        names = {row["student_name"] for row in rows}
+        assert names == {"Ada Test", "Bayo Test", "Chidi Test"}
+        assert all(row["kind"] == "report_card" and row["doc_version"] == 1 for row in rows)
+        assert all(
+            row["supersedes_id"] is None and row["correction_reason"] is None for row in rows
+        )
+
+        # ids round-trip into the download endpoint (reports.view suffices);
+        # storage is patched — no test ever touches S3
+        monkeypatch.setattr("app.documents.storage.get_storage", lambda: FakeStorage())
+        first = rows[0]
+        d = await w.client.get(
+            f"/api/v1/documents/{first['id']}/download", headers=w.auth(w.token("registrar"))
+        )
+        assert d.status_code == 200, d.text
+        assert d.json()["url"].startswith("https://objects.test/")
+
     async def test_correction_creates_superseding_version(self, world, monkeypatch) -> None:
         w = world
         jobs = await _drive_to(w, "published")

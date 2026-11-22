@@ -36,3 +36,21 @@ class DownloadResponse(BaseModel):
     document_id: UUID
     url: str
     expires_in: int
+
+
+class DocumentListItem(BaseModel):
+    """One published document on the reports screen (Phase 6).
+
+    A join projection — the row itself has no student name; the list query
+    resolves it through the enrolment. Not the download endpoint's schema
+    (that stays DocumentResponse-shaped).
+    """
+
+    id: UUID
+    kind: str
+    doc_version: int
+    enrolment_id: UUID | None
+    student_name: str | None
+    supersedes_id: UUID | None
+    correction_reason: str | None
+    published_at: datetime

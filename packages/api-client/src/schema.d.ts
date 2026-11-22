@@ -1153,6 +1153,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/assessment/{assessment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Assessment Documents
+         * @description Published documents for one assessment, student-named, versions
+         *     ascending (Phase 6 reports screen). Read-only over the INSERT-only
+         *     table; downloads go through /{document_id}/download which audits.
+         */
+        get: operations["list_assessment_documents_api_v1_documents_assessment__assessment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/download": {
         parameters: {
             query?: never;
@@ -1460,6 +1482,38 @@ export interface components {
              * @default true
              */
             required: boolean;
+        };
+        /**
+         * DocumentListItem
+         * @description One published document on the reports screen (Phase 6).
+         *
+         *     A join projection — the row itself has no student name; the list query
+         *     resolves it through the enrolment. Not the download endpoint's schema
+         *     (that stays DocumentResponse-shaped).
+         */
+        DocumentListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Doc Version */
+            doc_version: number;
+            /** Enrolment Id */
+            enrolment_id: string | null;
+            /** Student Name */
+            student_name: string | null;
+            /** Supersedes Id */
+            supersedes_id: string | null;
+            /** Correction Reason */
+            correction_reason: string | null;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
         };
         /**
          * DownloadResponse
@@ -4957,6 +5011,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_assessment_documents_api_v1_documents_assessment__assessment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentListItem"][];
                 };
             };
             /** @description Validation Error */

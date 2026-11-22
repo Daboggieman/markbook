@@ -5,6 +5,7 @@ import { AcademicPage } from "./pages/AcademicPage";
 import { AssessmentsPage } from "./pages/AssessmentsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
+import { ReportsPage } from "./pages/ReportsPage";
 import { ScoreSheetPage } from "./pages/ScoreSheetPage";
 import { ShellPage } from "./pages/ShellPage";
 import { StudentsPage } from "./pages/StudentsPage";
@@ -37,6 +38,7 @@ export function AppRoutes() {
           <Route path="assessments" element={<AssessmentsPage />} />
           <Route path="assessments/:assessmentId/sheet" element={<ScoreSheetPage />} />
           <Route path="users" element={<UsersPage />} />
+          <Route path="reports" element={<ReportsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

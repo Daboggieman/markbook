@@ -66,6 +66,19 @@ async def request_transcript(
     return {"job_id": str(job.id), "status_url": f"/api/v1/jobs/{job.id}"}
 
 
+@router.get("/assessment/{assessment_id}", response_model=list[schemas.DocumentListItem])
+async def list_assessment_documents(
+    assessment_id: UUID,
+    actor: Actor = Depends(require("reports.view")),
+    session: AsyncSession = Depends(get_actor_db),
+) -> list[schemas.DocumentListItem]:
+    """Published documents for one assessment, student-named, versions
+    ascending (Phase 6 reports screen). Read-only over the INSERT-only
+    table; downloads go through /{document_id}/download which audits."""
+    service = DocumentService(session)
+    return await service.list_for_assessment(actor.school_id, assessment_id)
+
+
 @router.get("/{document_id}/download", response_model=schemas.DownloadResponse)
 async def download_document(
     document_id: UUID,

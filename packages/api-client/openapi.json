@@ -3218,6 +3218,54 @@
         }
       }
     },
+    "/api/v1/documents/assessment/{assessment_id}": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "List Assessment Documents",
+        "description": "Published documents for one assessment, student-named, versions\nascending (Phase 6 reports screen). Read-only over the INSERT-only\ntable; downloads go through /{document_id}/download which audits.",
+        "operationId": "list_assessment_documents_api_v1_documents_assessment__assessment_id__get",
+        "parameters": [
+          {
+            "name": "assessment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assessment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentListItem"
+                  },
+                  "title": "Response List Assessment Documents Api V1 Documents Assessment  Assessment Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/download": {
       "get": {
         "tags": [
@@ -3836,6 +3884,87 @@
         ],
         "title": "ComponentDef",
         "description": "One score component inside a template version definition (spec \u00a76.4)."
+      },
+      "DocumentListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "doc_version": {
+            "type": "integer",
+            "title": "Doc Version"
+          },
+          "enrolment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrolment Id"
+          },
+          "student_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Name"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "correction_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Reason"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "doc_version",
+          "enrolment_id",
+          "student_name",
+          "supersedes_id",
+          "correction_reason",
+          "published_at"
+        ],
+        "title": "DocumentListItem",
+        "description": "One published document on the reports screen (Phase 6).\n\nA join projection \u2014 the row itself has no student name; the list query\nresolves it through the enrolment. Not the download endpoint's schema\n(that stays DocumentResponse-shaped)."
       },
       "DownloadResponse": {
         "properties": {
