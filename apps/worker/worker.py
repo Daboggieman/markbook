@@ -29,6 +29,19 @@ async def shutdown(ctx: dict[str, Any]) -> None:
 
 # Job functions are registered here as they are added (Phase 2+).
 # Each job is idempotent and re-runnable (spec §12).
+# Import EVERY module's models BEFORE the job modules: SQLAlchemy resolves
+# FKs and relationships through Base.metadata, and a job that first touches
+# a mapper whose FK target was never imported dies with NoReferencedTableError
+# at runtime (the first live worker boot, 2026-11-23, crashed exactly this
+# way on result_processing_runs → users).
+from app.academic import models as academic_models  # noqa: F401, E402
+from app.access import models as access_models  # noqa: F401, E402
+from app.assessment import models as assessment_models  # noqa: F401, E402
+from app.grading import models as grading_models  # noqa: F401, E402
+from app.identity import models as identity_models  # noqa: F401, E402
+from app.people import models as people_models  # noqa: F401, E402
+from app.workflow import models as workflow_models  # noqa: F401, E402
+
 from app.assessment.jobs import import_scores  # noqa: E402  — registered below
 from app.documents.jobs import report_cards, transcripts  # noqa: E402  — registered below
 from app.grading.jobs import process_results  # noqa: E402  — registered below

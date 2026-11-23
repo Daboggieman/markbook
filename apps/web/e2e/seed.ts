@@ -278,8 +278,56 @@ export async function seedAssessmentWorld(): Promise<SeededWorld> {
     if (!put.ok) throw new Error(`score entry failed: ${put.status}`);
   }
 
+  // the approval guard needs a CURRENT SUCCESSFUL processing run: create
+  // (or find) the scheme, fire the process job, and wait for the worker
+  // to consume it — no worker means the walk dead-ends at Approve.
+  // Back to the ADMIN: scheme create/activate (assessments.manage) and
+  // process (results.process) are admin permissions the teacher lacks.
+  await loginAs(ADMIN.email, ADMIN.password);
+  const scheme = await findOrCreate<{ id: string; name: string }>(
+    "/api/v1/grading-schemes",
+    (s) => s.name === "E2E Scheme",
+    () => call("POST", "/api/v1/grading-schemes", { name: "E2E Scheme", definition: SCHEME_DEFINITION }),
+  );
+  // activating an already-active version 409s — harmless, call() passes it
+  await call("POST", `/api/v1/grading-schemes/${scheme.id}/activate`, {});
+  const procRes = await call("POST", `/api/v1/assessments/${assessmentId}/process`, {
+    scheme_id: scheme.id,
+  });
+  if (procRes.status !== 202 && procRes.status !== 200) {
+    throw new Error(`process enqueue failed: ${procRes.status}`);
+  }
+  const procJob = ((await procRes.json()) as { job_id?: string }).job_id;
+  if (procJob) {
+    for (let i = 0; i < 60; i++) {
+      const job = (await (await call("GET", `/api/v1/jobs/${procJob}`)).json()) as {
+        status: string;
+      };
+      if (job.status === "succeeded") break;
+      if (job.status === "failed") throw new Error("process run failed");
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+
   return { templateVersionId: versionId, assessmentId, componentKeys: ["CA1", "Exam"], rows };
 }
+
+const SCHEME_DEFINITION = {
+  rounding_mode: "ROUND_HALF_UP",
+  precision: 0,
+  missing_policy: "flag_incomplete",
+  absent_policy: "treat_zero",
+  exempt_policy: "exclude_and_renormalise",
+  boundaries: [
+    { grade: "A", min: 70, max: 100 },
+    { grade: "B", min: 60, max: 69 },
+    { grade: "C", min: 50, max: 59 },
+    { grade: "D", min: 45, max: 49 },
+    { grade: "E", min: 40, max: 44 },
+    { grade: "F", min: 0, max: 39 },
+  ],
+  tie_policy: "dense",
+};
 
 /** UI login for a test's own browser context (the honest path — the form). */
 export async function loginToken(
