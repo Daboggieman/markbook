@@ -328,10 +328,16 @@ class IdentityService:
         return MfaSetupResponse(secret=secret, otpauth_uri=uri)
 
     async def verify_mfa(self, user: User, totp_code: str) -> bool:
+        """Check a TOTP code; the FIRST successful verify completes enrolment
+        (mfa_enabled flips here — until then the secret is pending and
+        reauth still treats the account as non-MFA)."""
 
         if not user.mfa_secret:
             return False
-        return pyotp.TOTP(user.mfa_secret).verify(totp_code, valid_window=1)
+        ok = pyotp.TOTP(user.mfa_secret).verify(totp_code, valid_window=1)
+        if ok and not user.mfa_enabled:
+            user.mfa_enabled = True
+        return ok
 
     # ---- step-up re-auth (Phase 5, spec §7.1) -------------------------------
 
