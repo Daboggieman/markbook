@@ -12,62 +12,28 @@
 # Error details
 
 ```
-Error: expect(locator).toBeVisible() failed
+Test timeout of 30000ms exceeded.
+```
 
-Locator: getByText('submitted', { exact: true })
-Expected: visible
-Timeout: 5000ms
-Error: element(s) not found
-
+```
+Error: locator.fill: Test timeout of 30000ms exceeded.
 Call log:
-  - Expect "toBeVisible" getByText('submitted', { exact: true }) with timeout 5000ms
-  - waiting for getByText('submitted', { exact: true })
+  - waiting for getByLabel(/Ada E2E First CA/)
 
 ```
 
+# Page snapshot
+
 ```yaml
-- navigation "Main":
-  - list:
-    - listitem:
-      - link "Dashboard":
-        - /url: /
-    - listitem:
-      - link "Assessments":
-        - /url: /assessments
-- main:
-  - paragraph: e2e-teacher · e2e-teacher@seed.school
-  - button "Sign out"
-  - heading "Score sheet draft" [level=2]
-  - paragraph: Type scores; m = missing, a = absent, e = exempt. Enter/↓ next student, ↑ back, Tab next column.
-  - heading "3 students" [level=3]
-  - table:
-    - rowgroup:
-      - row "Student First CA /10 Exam /60":
-        - columnheader "Student"
-        - columnheader "First CA /10"
-        - columnheader "Exam /60"
-    - rowgroup:
-      - row "Ada E2E 9 28.00":
-        - cell "Ada E2E"
-        - cell "9":
-          - textbox "Ada E2E First CA": "9"
-        - cell "28.00":
-          - textbox "Ada E2E Exam": "28.00"
-      - row "Bayo E2E 8.008 28.00":
-        - cell "Bayo E2E"
-        - cell "8.008":
-          - textbox "Bayo E2E First CA": "8.008"
-        - cell "28.00":
-          - textbox "Bayo E2E Exam": "28.00"
-      - row "Chidi E2E 8.00 28.00":
-        - cell "Chidi E2E"
-        - cell "8.00":
-          - textbox "Chidi E2E First CA": "8.00"
-        - cell "28.00":
-          - textbox "Chidi E2E Exam": "28.00"
-  - button "Save 2 changes"
-  - region "Workflow actions":
-    - button "Submit for review"
+- generic [ref=f1e3]:
+  - heading "Markbook" [level=1] [ref=f1e4]
+  - generic [ref=f1e5]:
+    - text: Email
+    - textbox "Email" [ref=f1e6]
+  - generic [ref=f1e7]:
+    - text: Password
+    - textbox "Password" [ref=f1e8]
+  - button "Sign in" [ref=f1e9] [cursor=pointer]
 ```
 
 # Test source
@@ -114,61 +80,63 @@ Call log:
   39 |   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   40 | 
   41 |   await page.goto(`/assessments/${world.assessmentId}/sheet`);
-  42 |   // keyboard entry: focus the first CA1 cell, type, Enter walks down
-  43 |   const firstCell = page.getByLabel(new RegExp(`${world.rows[0]!.student_name} First CA`));
-  44 |   await firstCell.fill("9");
-  45 |   await firstCell.press("Enter");
-  46 |   await expect(page.getByLabel(new RegExp(`${world.rows[1]!.student_name} First CA`))).toBeFocused();
-  47 |   await page.keyboard.type("8");
-  48 |   await page.getByRole("button", { name: /Save \d+ change/ }).click();
-  49 |   await expect(page.getByRole("button", { name: "Submit for review" })).toBeVisible();
-  50 |   await page.getByRole("button", { name: "Submit for review" }).click();
-> 51 |   await expect(page.getByText("submitted", { exact: true })).toBeVisible();
-     |                                                              ^ Error: expect(locator).toBeVisible() failed
-  52 | });
-  53 | 
-  54 | test("reviewer starts the review; admin approves and locks with step-up", async ({ page }) => {
-  55 |   await loginToken(page, REVIEWER.email, REVIEWER.password);
-  56 |   await page.goto(`/assessments/${world.assessmentId}/sheet`);
-  57 |   await page.getByRole("button", { name: "Start review" }).click();
-  58 |   await expect(page.getByText("under_review").first()).toBeVisible();
-  59 | 
-  60 |   await loginToken(page, "admin@seed.school", "Dev-Admin-2026");
-  61 |   await page.goto(`/assessments/${world.assessmentId}/sheet`);
-  62 |   await page.getByRole("button", { name: "Approve" }).click();
-  63 |   await expect(page.getByText("approved").first()).toBeVisible();
-  64 | 
-  65 |   // lock — the step-up dialog demands the password
-  66 |   await page.getByRole("button", { name: "Lock results" }).click();
-  67 |   await page.getByLabel("Confirm password").fill("Dev-Admin-2026");
-  68 |   await page.getByRole("button", { name: "Confirm" }).click();
-  69 |   await expect(page.getByText("locked").first()).toBeVisible();
-  70 | });
-  71 | 
-  72 | test("publish demands re-auth with the authenticator code", async ({ page }) => {
-  73 |   await loginToken(page, "admin@seed.school", "Dev-Admin-2026");
-  74 |   await page.goto(`/assessments/${world.assessmentId}/sheet`);
-  75 |   await page.getByRole("button", { name: "Publish" }).click();
-  76 |   await page.getByLabel("Confirm password").fill("Dev-Admin-2026");
-  77 |   await page.getByRole("button", { name: "Confirm" }).click();
-  78 |   // MFA_REQUIRED reveals the field; the seed enrolled the admin
-  79 |   const totp = page.getByLabel("Authenticator code");
-  80 |   await expect(totp).toBeVisible();
-  81 |   await totp.fill(totpNow(adminMfa.secret));
-  82 |   await page.getByRole("button", { name: "Confirm" }).click();
-  83 |   await expect(page.getByText("published").first()).toBeVisible();
-  84 | });
-  85 | 
-  86 | test("correction after publish creates a superseding document version", async ({ page }) => {
-  87 |   await loginToken(page, "admin@seed.school", "Dev-Admin-2026");
-  88 |   await page.goto(`/assessments/${world.assessmentId}/sheet`);
-  89 |   await page.getByRole("button", { name: "Correct results" }).click();
-  90 |   await page.getByLabel("Correct results reason").fill("E2E: exam recheck");
-  91 |   await page.getByRole("button", { name: "Confirm Correct results" }).click();
-  92 |   // the document list (Reports screen) then shows v2 rows superseding v1
-  93 |   await page.goto("/reports");
-  94 |   await page.getByLabel("Assessment").selectOption(world.assessmentId);
-  95 |   await expect(page.getByRole("cell", { name: "v2" }).first()).toBeVisible();
-  96 | });
-  97 | 
+  42 |   // keyboard entry: focus the first CA1 cell, replace its value, Enter walks
+  43 |   // down (fill() replaces — keyboard.type would append to the seeded value)
+  44 |   const firstCell = page.getByLabel(new RegExp(`${world.rows[0]!.student_name} First CA`));
+> 45 |   await firstCell.fill("9");
+     |                   ^ Error: locator.fill: Test timeout of 30000ms exceeded.
+  46 |   await firstCell.press("Enter");
+  47 |   const secondCell = page.getByLabel(new RegExp(`${world.rows[1]!.student_name} First CA`));
+  48 |   await expect(secondCell).toBeFocused();
+  49 |   await secondCell.fill("8");
+  50 |   await page.getByRole("button", { name: /Save \d+ change/ }).click();
+  51 |   await expect(page.getByRole("button", { name: "Submit for review" })).toBeVisible();
+  52 |   await page.getByRole("button", { name: "Submit for review" }).click();
+  53 |   await expect(page.getByText("submitted", { exact: true })).toBeVisible();
+  54 | });
+  55 | 
+  56 | test("reviewer starts the review; admin approves and locks with step-up", async ({ page }) => {
+  57 |   await loginToken(page, REVIEWER.email, REVIEWER.password);
+  58 |   await page.goto(`/assessments/${world.assessmentId}/sheet`);
+  59 |   await page.getByRole("button", { name: "Start review" }).click();
+  60 |   await expect(page.getByText("under_review").first()).toBeVisible();
+  61 | 
+  62 |   await loginToken(page, "admin@seed.school", "Dev-Admin-2026");
+  63 |   await page.goto(`/assessments/${world.assessmentId}/sheet`);
+  64 |   await page.getByRole("button", { name: "Approve" }).click();
+  65 |   await expect(page.getByText("approved").first()).toBeVisible();
+  66 | 
+  67 |   // lock — the step-up dialog demands the password
+  68 |   await page.getByRole("button", { name: "Lock results" }).click();
+  69 |   await page.getByLabel("Confirm password").fill("Dev-Admin-2026");
+  70 |   await page.getByRole("button", { name: "Confirm" }).click();
+  71 |   await expect(page.getByText("locked").first()).toBeVisible();
+  72 | });
+  73 | 
+  74 | test("publish demands re-auth with the authenticator code", async ({ page }) => {
+  75 |   await loginToken(page, "admin@seed.school", "Dev-Admin-2026");
+  76 |   await page.goto(`/assessments/${world.assessmentId}/sheet`);
+  77 |   await page.getByRole("button", { name: "Publish" }).click();
+  78 |   await page.getByLabel("Confirm password").fill("Dev-Admin-2026");
+  79 |   await page.getByRole("button", { name: "Confirm" }).click();
+  80 |   // MFA_REQUIRED reveals the field; the seed enrolled the admin
+  81 |   const totp = page.getByLabel("Authenticator code");
+  82 |   await expect(totp).toBeVisible();
+  83 |   await totp.fill(totpNow(adminMfa.secret));
+  84 |   await page.getByRole("button", { name: "Confirm" }).click();
+  85 |   await expect(page.getByText("published").first()).toBeVisible();
+  86 | });
+  87 | 
+  88 | test("correction after publish creates a superseding document version", async ({ page }) => {
+  89 |   await loginToken(page, "admin@seed.school", "Dev-Admin-2026");
+  90 |   await page.goto(`/assessments/${world.assessmentId}/sheet`);
+  91 |   await page.getByRole("button", { name: "Correct results" }).click();
+  92 |   await page.getByLabel("Correct results reason").fill("E2E: exam recheck");
+  93 |   await page.getByRole("button", { name: "Confirm Correct results" }).click();
+  94 |   // the document list (Reports screen) then shows v2 rows superseding v1
+  95 |   await page.goto("/reports");
+  96 |   await page.getByLabel("Assessment").selectOption(world.assessmentId);
+  97 |   await expect(page.getByRole("cell", { name: "v2" }).first()).toBeVisible();
+  98 | });
+  99 | 
 ```

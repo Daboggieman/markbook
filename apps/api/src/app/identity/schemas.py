@@ -35,7 +35,10 @@ class RefreshRequest(BaseModel):
 
 class RefreshResponse(BaseModel):
     access_token: str
-    expires_in: int
+    # The ROTATED refresh token — rotation invalidates the presented one, so
+    # a client that never receives the replacement can only refresh once;
+    # every later refresh trips reuse detection and revokes the family.
+    refresh_token: str
     token_type: str = "bearer"
 
 

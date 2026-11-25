@@ -168,6 +168,10 @@ async def mfa_verify(
         raise ProblemError("NOT_FOUND", "User not found", status=404)
     service = IdentityService(session)
     ok = await service.verify_mfa(user, body.totp_code)
+    if ok:
+        # the enrolment flip must persist — without this the account never
+        # becomes MFA-enabled and publish's reauth_mfa gate never opens
+        await session.commit()
     return {"verified": ok}
 
 

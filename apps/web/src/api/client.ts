@@ -63,8 +63,7 @@ export let refreshInFlight = false;
 
 let refreshing: Promise<string | null> | null = null;
 
-/** Rotate the refresh token; returns the new access token or null. */
-export async function refreshAccessToken(): Promise<string | null> {
+async function refreshInner(): Promise<string | null> {
   const rt = tokens.refresh;
   if (!rt) return null;
   const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
@@ -76,9 +75,28 @@ export async function refreshAccessToken(): Promise<string | null> {
     tokens.refresh = null; // reuse/rotation failure — the family is dead
     return null;
   }
-  const body = (await res.json()) as { access_token: string };
+  const body = (await res.json()) as { access_token: string; refresh_token?: string };
   tokens.access = body.access_token;
+  // Rotation: the API replaces the presented refresh token and delivers the
+  // new one — persist it or the NEXT refresh reads as reuse and revokes
+  // the family.
+  if (body.refresh_token) tokens.refresh = body.refresh_token;
   return body.access_token;
+}
+
+/**
+ * Rotate the refresh token; returns the new access token or null.
+ * Single-flight across ALL callers (the boot effect and the 401
+ * interceptor): React StrictMode mounts the boot effect twice in dev, and
+ * two concurrent rotations on one token race the server's reuse check.
+ */
+export async function refreshAccessToken(): Promise<string | null> {
+  refreshing ??= refreshInner().finally(() => {
+    refreshing = null;
+    refreshInFlight = false;
+  });
+  refreshInFlight = refreshing !== null;
+  return refreshing;
 }
 
 const authedFetch: typeof fetch = async (input, init) => {
@@ -100,12 +118,8 @@ const authedFetch: typeof fetch = async (input, init) => {
       : new Request(source, { ...(init ?? {}), headers });
   let res = await fetch(build());
   if (res.status === 401 && tokens.access) {
-    refreshing ??= refreshAccessToken().finally(() => {
-      refreshing = null;
-    });
-    refreshInFlight = refreshing !== null;
-    const fresh = await refreshing;
-    refreshInFlight = false;
+    // refreshAccessToken is single-flight — concurrent 401s share one rotation
+    const fresh = await refreshAccessToken();
     if (fresh) {
       headers.set("Authorization", `Bearer ${fresh}`);
       res = await fetch(build());
