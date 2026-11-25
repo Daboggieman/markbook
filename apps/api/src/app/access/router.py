@@ -150,6 +150,21 @@ async def list_permissions(
 # ---------------------------------------------------------------------------
 
 
+@router.get(
+    "/users/{user_id}/roles",
+    response_model=list[schemas.RoleResponse],
+    dependencies=[Depends(require("users.view"))],
+)
+async def list_user_roles(
+    user_id: UUID,
+    actor: Actor = Depends(require("users.view")),
+    session: AsyncSession = Depends(get_actor_db),
+) -> list[schemas.RoleResponse]:
+    """Roles the user holds — the per-user management screen reads this."""
+    repo = AccessRepository(session)
+    return [schemas.RoleResponse.model_validate(r) for r in await repo.roles_for_user(user_id)]
+
+
 @router.post("/users/{user_id}/roles", dependencies=[Depends(require("users.edit"))])
 async def assign_role_to_user(
     user_id: UUID,

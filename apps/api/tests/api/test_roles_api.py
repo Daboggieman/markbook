@@ -91,6 +91,7 @@ class TestRolesLifecycle:
                 (GRANT_SQL, {"r": role, "p": "roles.view", "sc": "school"}),
                 (GRANT_SQL, {"r": role, "p": "roles.manage", "sc": "school"}),
                 (GRANT_SQL, {"r": role, "p": "permissions.view", "sc": "school"}),
+                (GRANT_SQL, {"r": role, "p": "users.view", "sc": "school"}),
                 (GRANT_SQL, {"r": role, "p": "users.edit", "sc": "school"}),
                 (USER_ROLE_SQL, {"u": admin, "r": role, "s": school}),
             ],
@@ -138,6 +139,10 @@ class TestRolesLifecycle:
                 f"/api/v1/users/{user2}/roles", headers=headers, json={"role_id": form_master["id"]}
             )
             assert r.status_code == 200, r.text
+            # the new listing endpoint shows the held role
+            r = await c.get(f"/api/v1/users/{user2}/roles", headers=headers)
+            assert r.status_code == 200, r.text
+            assert [g["name"] for g in r.json()] == ["Form Master"]
             token2, _ = create_access_token(
                 user_id=user2, school_id=school, token_version=1, session_id=uuid4()
             )

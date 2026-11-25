@@ -130,6 +130,16 @@ class AccessRepository:
             out.setdefault(role_id, []).append((code, scope))
         return out
 
+    async def roles_for_user(self, user_id: UUID) -> list[Role]:
+        """Roles the user currently holds (for the per-user management UI)."""
+        result = await self._s.execute(
+            select(Role)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == user_id)
+            .order_by(Role.name)
+        )
+        return list(result.scalars().all())
+
     async def unassign_role_from_user(self, user_id: UUID, role_id: UUID) -> bool:
         """Revoke one role grant; True when a junction row was removed."""
         result = cast(

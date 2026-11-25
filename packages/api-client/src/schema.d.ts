@@ -290,7 +290,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List User Roles
+         * @description Roles the user holds — the per-user management screen reads this.
+         */
+        get: operations["list_user_roles_api_v1_users__user_id__roles_get"];
         put?: never;
         /**
          * Assign Role To User
@@ -2003,6 +2007,30 @@ export interface components {
              */
             scope_type: string;
         };
+        /** RoleResponse */
+        RoleResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * School Id
+             * Format: uuid
+             */
+            school_id: string;
+            /** Name */
+            name: string;
+            /** Is Super Admin */
+            is_super_admin: boolean;
+            /** Description */
+            description: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** RoleWithPermissions */
         RoleWithPermissions: {
             /**
@@ -3222,6 +3250,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PermissionResponse"][];
+                };
+            };
+        };
+    };
+    list_user_roles_api_v1_users__user_id__roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -1,14 +1,16 @@
 /**
- * User administration: the school's users, a create form, and an
- * active/suspended status flip. There is no roles-list endpoint yet, so
- * there is deliberately no role picker — role assignment lands when the
- * API exposes one; new users start with no roles.
+ * User administration: the school's users, a create form, an active/suspended
+ * status flip, and per-user role management (grant/revoke) on top of the
+ * Phase 6 roles endpoints. New users start role-less — grant roles from the
+ * row's "Roles" action; a user with no roles sees only the dashboard, which
+ * is the permission model doing its job (UI hides, backend enforces).
  *
  * Visibility: the page needs `users.view`; the create form additionally
- * needs `users.create` and the status control `users.edit` (UI filters
- * only — the API re-checks everything). The status control is hidden for
- * super-admin rows (last-super-admin protection is enforced server-side;
- * a rejected PATCH surfaces in the error banner).
+ * needs `users.create`, the status control and role grants `users.edit`, and
+ * the role picker only renders with `roles.view` (it lists the school's
+ * roles). UI filters only — the API re-checks everything. The status control
+ * is hidden for super-admin rows (last-super-admin protection is enforced
+ * server-side; a rejected PATCH surfaces in the error banner).
  */
 import type { components } from "@markbook/api-client";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -20,6 +22,7 @@ import { DataTable, Empty, ErrorBanner, Field, Loading, Panel } from "../compone
 import { unwrap, useApiQuery } from "../hooks/useApiQuery";
 
 type UserListItem = components["schemas"]["UserListItem"];
+type Role = components["schemas"]["RoleResponse"];
 
 /**
  * One inline create form. `children` are the Field inputs (uncontrolled —
@@ -46,9 +49,12 @@ function CreateForm({
         e.preventDefault();
         setBusy(true);
         setError(null);
+        // Capture the element now: React nulls e.currentTarget once this
+        // handler yields at the await, so reset() must use the local ref.
+        const form = e.currentTarget;
         try {
-          await onSubmit(new FormData(e.currentTarget));
-          e.currentTarget.reset();
+          await onSubmit(new FormData(form));
+          form.reset();
         } catch (err) {
           setError(problemMessage(err));
         } finally {
@@ -65,8 +71,122 @@ function CreateForm({
   );
 }
 
-function UsersPanel({ canCreate, canEdit }: { canCreate: boolean; canEdit: boolean }) {
+/** Grant/revoke roles for one user (users.edit gates both directions). */
+function UserRolesManager({
+  userId,
+  schoolRoles,
+  canEdit,
+}: {
+  userId: string;
+  schoolRoles: Role[];
+  canEdit: boolean;
+}) {
+  const q = useApiQuery(
+    () => unwrap(api.GET("/api/v1/users/{user_id}/roles", { params: { path: { user_id: userId } } })),
+    [userId],
+  );
+  const [roleId, setRoleId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      q.reload();
+    } catch (err) {
+      setError(problemMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const held = q.data ?? [];
+  const available = schoolRoles.filter((r) => !held.some((h) => h.id === r.id));
+  return (
+    <div className="detail-box">
+      {q.loading && <Loading />}
+      {q.error && <ErrorBanner message={q.error} />}
+      {error && <ErrorBanner message={error} />}
+      {held.length === 0 && !q.loading && <Empty label="No roles granted." />}
+      {held.length > 0 && (
+        <DataTable headers={["Role", "Super admin", ""]}>
+          {held.map((r) => (
+            <tr key={r.id}>
+              <td>{r.name}</td>
+              <td>{r.is_super_admin ? "✓" : ""}</td>
+              <td>
+                {canEdit && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      run(() =>
+                        api.DELETE("/api/v1/users/{user_id}/roles/{role_id}", {
+                          params: { path: { user_id: userId, role_id: r.id } },
+                        }),
+                      )
+                    }
+                  >
+                    Revoke
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </DataTable>
+      )}
+      {canEdit && (
+        <form
+          className="inline-form"
+          onSubmit={(e: FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            if (!roleId) return;
+            void run(() =>
+              api.POST("/api/v1/users/{user_id}/roles", {
+                params: { path: { user_id: userId } },
+                body: { role_id: roleId },
+              }),
+            );
+            setRoleId("");
+          }}
+        >
+          <Field label="Grant role">
+            <select value={roleId} onChange={(e) => setRoleId(e.target.value)}>
+              <option value="">—</option>
+              {available.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                  {r.is_super_admin ? " (super admin)" : ""}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <button type="submit" disabled={busy || !roleId}>
+            Grant
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function UsersPanel({
+  canCreate,
+  canEdit,
+  canRolesView,
+}: {
+  canCreate: boolean;
+  canEdit: boolean;
+  canRolesView: boolean;
+}) {
   const q = useApiQuery(() => unwrap(api.GET("/api/v1/auth/users", {})), []);
+  const rolesQ = useApiQuery(
+    () => (canRolesView ? unwrap(api.GET("/api/v1/roles", {})) : Promise.resolve([] as Role[])),
+    [canRolesView],
+  );
+  const [open, setOpen] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
 
   const setStatus = async (user: UserListItem, status: "active" | "suspended"): Promise<void> => {
@@ -96,8 +216,8 @@ function UsersPanel({ canCreate, canEdit }: { canCreate: boolean; canEdit: boole
                 email: String(f.get("email") || ""),
                 username: String(f.get("username") || ""),
                 password: String(f.get("password") || ""),
-                // No roles-list endpoint yet, so no role picker: new users
-                // start role-less; assignment lands when GET /roles exists.
+                // Users always start role-less; roles are granted per user
+                // afterwards via POST /users/{id}/roles.
                 role_ids: [],
                 is_super_admin: f.get("is_super_admin") === "on",
               },
@@ -133,6 +253,11 @@ function UsersPanel({ canCreate, canEdit }: { canCreate: boolean; canEdit: boole
               <td>{u.mfa_enabled ? "✓" : "—"}</td>
               <td>{u.is_super_admin ? "✓" : ""}</td>
               <td>
+                {canRolesView && (
+                  <button type="button" onClick={() => setOpen(open === u.id ? null : u.id)}>
+                    Roles
+                  </button>
+                )}{" "}
                 {u.is_super_admin || !canEdit ? null : (
                   <button
                     type="button"
@@ -146,6 +271,9 @@ function UsersPanel({ canCreate, canEdit }: { canCreate: boolean; canEdit: boole
           ))}
         </DataTable>
       )}
+      {open && canRolesView && (
+        <UserRolesManager userId={open} schoolRoles={rolesQ.data ?? []} canEdit={canEdit} />
+      )}
     </Panel>
   );
 }
@@ -154,6 +282,7 @@ export function UsersPage() {
   const { profile } = useAuth();
   const canCreate = hasPermission(profile, "users.create");
   const canEdit = hasPermission(profile, "users.edit");
+  const canRolesView = hasPermission(profile, "roles.view");
   if (!hasPermission(profile, "users.view")) {
     return (
       <section>
@@ -166,10 +295,11 @@ export function UsersPage() {
     <section>
       <h2>Users</h2>
       <p className="page-note">
-        Sign-in accounts for your school. Role assignment lands when the API exposes a roles list —
-        new users start with no roles.
+        Sign-in accounts for your school. New users start with no roles — use the row's
+        &quot;Roles&quot; action to grant them (they see only the dashboard until a role grants
+        permissions).
       </p>
-      <UsersPanel canCreate={canCreate} canEdit={canEdit} />
+      <UsersPanel canCreate={canCreate} canEdit={canEdit} canRolesView={canRolesView} />
     </section>
   );
 }
