@@ -225,7 +225,7 @@ class IdentityService:
             token_version=user.token_version,
             session_id=session.id,
         )
-        return RefreshResponse(access_token=access_token, expires_in=ttl)
+        return RefreshResponse(access_token=access_token, refresh_token=new_refresh, expires_in=ttl)
 
     # ---- logout / revocation ----------------------------------------------
 

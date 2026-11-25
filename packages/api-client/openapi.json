@@ -5023,9 +5023,9 @@
             "type": "string",
             "title": "Access Token"
           },
-          "expires_in": {
-            "type": "integer",
-            "title": "Expires In"
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
           },
           "token_type": {
             "type": "string",
@@ -5036,7 +5036,7 @@
         "type": "object",
         "required": [
           "access_token",
-          "expires_in"
+          "refresh_token"
         ],
         "title": "RefreshResponse"
       },

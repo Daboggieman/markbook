@@ -76,8 +76,16 @@ class IdentityRepository:
         return session
 
     async def get_session_by_refresh_hash(self, refresh_token_hash: bytes) -> Session | None:
+        # FOR UPDATE serialises concurrent refreshes: two requests racing on
+        # the SAME (still-valid) token would otherwise both read the original
+        # hash, both rotate, and both return 200 — the client then stores one
+        # token while the row holds the other, and the next refresh reads as
+        # reuse and revokes the family. Locked: the second waiter sees the
+        # rotated hash and is correctly refused.
         result = await self._s.execute(
-            select(Session).where(Session.refresh_token_hash == refresh_token_hash)
+            select(Session)
+            .where(Session.refresh_token_hash == refresh_token_hash)
+            .with_for_update()
         )
         return result.scalar_one_or_none()
 

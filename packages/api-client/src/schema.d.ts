@@ -1952,8 +1952,8 @@ export interface components {
         RefreshResponse: {
             /** Access Token */
             access_token: string;
-            /** Expires In */
-            expires_in: number;
+            /** Refresh Token */
+            refresh_token: string;
             /**
              * Token Type
              * @default bearer
